@@ -21,3 +21,6 @@ Bài 6
 ![Minh chứng bài 6-1](image-8.png)
 ![Minh chứng bài 6-2](image-9.png)
 ![Minh chứng bài 6 (kết quả)](image-7.png)
+
+BTVN
+![Minh chứng BTVN](image-11.png)

@@ -1,0 +1,10 @@
+
+*.py[cod]
+*$py.class
+
+.venv/
+venv/
+ENV/
+env/
+
+.env
