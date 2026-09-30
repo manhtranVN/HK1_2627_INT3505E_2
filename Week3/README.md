@@ -24,3 +24,17 @@
     └── /{slug}/posts               GET
 ```
 
+## Bài 2:
+Kiểm thử các trường hợp:
+1. /resources/1 trả 200 và dữ liệu bình thường.
+![alt text](image.png)
+2. /resources/99 trả 404 kèm Content-Type: application/problem+json.
+![alt text](image-1.png)
+3. /nope trả 404 từ handler fallback.
+![alt text](image-2.png)
+4. /boom trả 500.
+![alt text](image-3.png)
+5. Khi có Accept: application/json, vẫn trả problem+json.
+![alt text](image-4.png)
+6.POST vào route chỉ có GET sẽ trả 405 Method Not Allowed dạng problem+json.
+![alt text](image-5.png)
