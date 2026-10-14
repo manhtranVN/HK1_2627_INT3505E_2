@@ -1,12 +1,3 @@
-"""
-Week 4: API Specification và OpenAPI với Flask + Swagger UI
-Dựa theo nội dung slide Buổi 4 (UET - Kỹ thuật Hướng Dịch vụ)
-- Cung cấp 5 endpoints chuẩn RESTful cho Tasks API (list, create, get, patch, delete)
-- Endpoint /openapi.json trả về đặc tả OpenAPI 3.0.3 (đọc từ w4-1.yaml / apispec)
-- Endpoint /docs nhúng Swagger UI hiển thị docs và cho phép "Try it out" tương tác trực tiếp
-- Chuẩn lỗi RFC 7807 (Problem Details) application/problem+json
-"""
-
 import os
 import uuid
 from datetime import datetime, timezone
@@ -17,7 +8,6 @@ from apispec import APISpec
 from apispec.ext.marshmallow import MarshmallowPlugin
 from apispec_webframeworks.flask import FlaskPlugin
 
-# Khởi tạo ứng dụng Flask
 app = Flask(__name__)
 
 class TaskSchema(Schema):
@@ -195,11 +185,6 @@ SWAGGER_HTML = """<!DOCTYPE html>
 </body>
 </html>
 """
-
-
-# ==============================================================================
-# 5. CÁC ROUTES PHỤC VỤ TÀI LIỆU (SWAGGER UI & OPENAPI SPEC)
-# ==============================================================================
 @app.get("/")
 def index():
     """Điều hướng trang chủ đến /docs"""
@@ -244,10 +229,6 @@ def spec_yaml():
     return Response(yaml.dump(spec.to_dict(), allow_unicode=True), mimetype="text/yaml; charset=utf-8")
 
 
-# ==============================================================================
-# 6. NĂM ENDPOINTS TASKS API (Slide 22, 23, 27-30)
-# Hỗ trợ cả prefix /v1/tasks và /tasks để đồng bộ hoàn toàn với Swagger UI và Slide
-# ==============================================================================
 
 # --- Endpoint 1: GET /tasks (List Tasks) ---
 @app.get("/tasks")
@@ -544,9 +525,6 @@ with app.test_request_context():
     spec.path(view=delete_task)
 
 
-# ==============================================================================
-# 8. CHẠY SERVER FLASK
-# ==============================================================================
 if __name__ == "__main__":
     print("=" * 60)
     print("Tasks API Server đang chạy!")
