@@ -6,13 +6,11 @@ bp = Blueprint("authors", __name__)
 
 @bp.get("")
 def list_authors():
-    """GET /api/v1/authors: Danh sách tác giả"""
     authors = db.session.scalars(select(Author).order_by(Author.id.asc())).all()
     return jsonify([a.to_dict() for a in authors]), 200
 
 @bp.post("")
 def create_author():
-    """POST /api/v1/authors: Tạo tác giả mới"""
     data = request.get_json(silent=True) or {}
     if not data.get("name"):
         return jsonify({"error": "bad_request", "message": "name là bắt buộc"}), 400
@@ -24,7 +22,6 @@ def create_author():
 
 @bp.get("/<int:author_id>")
 def get_author(author_id):
-    """GET /api/v1/authors/<id>: Xem chi tiết tác giả"""
     author = db.session.get(Author, author_id)
     if not author:
         return jsonify({"error": "not_found", "message": f"Không tìm thấy tác giả ID {author_id}"}), 404
@@ -32,7 +29,6 @@ def get_author(author_id):
 
 @bp.get("/<int:author_id>/books")
 def list_author_books(author_id):
-    """GET /api/v1/authors/<id>/books: Danh sách sách của một tác giả theo Slide 1 & 10"""
     author = db.session.get(Author, author_id)
     if not author:
         return jsonify({"error": "not_found", "message": f"Không tìm thấy tác giả ID {author_id}"}), 404

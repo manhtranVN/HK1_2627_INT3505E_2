@@ -1,0 +1,77 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://api.hotelbooking.com/schemas/hotel.schema.json",
+    "title": "Hotel",
+    "description": "JSON representation of a Hotel resource",
+    "type": "object",
+    "required": [
+        "id",
+        "name",
+        "starRating",
+        "city",
+        "address",
+        "contact",
+        "createdAt"
+    ],
+    "properties": {
+        "id": {
+            "type": "string",
+            "pattern": "^hotel_[a-zA-Z0-9]+$",
+            "description": "Mã định danh duy nhất của khách sạn, có prefix hotel_"
+        },
+        "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 200
+        },
+        "starRating": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+        },
+        "city": {
+            "type": "string",
+            "minLength": 2
+        },
+        "address": {
+            "type": "string",
+            "minLength": 5
+        },
+        "description": {
+            "type": "string"
+        },
+        "contact": {
+            "type": "object",
+            "required": [
+                "phone",
+                "email"
+            ],
+            "properties": {
+                "phone": {
+                    "type": "string",
+                    "pattern": "^\\+?[0-9]{9,15}$"
+                },
+                "email": {
+                    "type": "string",
+                    "format": "email"
+                }
+            }
+        },
+        "amenities": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "uniqueItems": true
+        },
+        "isActive": {
+            "type": "boolean",
+            "default": true
+        },
+        "createdAt": {
+            "type": "string",
+            "format": "date-time"
+        }
+    },
+    "additionalProperties": false
+}

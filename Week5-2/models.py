@@ -1,12 +1,11 @@
 from datetime import datetime, timezone
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import Integer, String, Text, ForeignKey, DateTime, Boolean
+from sqlalchemy import Integer, String, Text, ForeignKey, DateTime
 from sqlalchemy.orm import mapped_column, relationship
 
 db = SQLAlchemy()
 
 class Category(db.Model):
-    """Thể loại sách (Genre / Category) theo Slide 17 & 29"""
     __tablename__ = "categories"
 
     id = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -24,7 +23,6 @@ class Category(db.Model):
 
 
 class Author(db.Model):
-    """Tác giả theo Slide 16 & 17"""
     __tablename__ = "authors"
 
     id = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -42,12 +40,11 @@ class Author(db.Model):
 
 
 class BookAuthor(db.Model):
-    """Junction table quan hệ N:M giữa Book và Author kèm metadata role theo Slide 11"""
     __tablename__ = "book_authors"
 
     book_id = mapped_column(Integer, ForeignKey("books.id", ondelete="CASCADE"), primary_key=True)
     author_id = mapped_column(Integer, ForeignKey("authors.id", ondelete="CASCADE"), primary_key=True)
-    role = mapped_column(String(50), default="co", nullable=False)  # lead, co, ed
+    role = mapped_column(String(50), default="co", nullable=False)
 
     book = relationship("Book", back_populates="book_authors")
     author = relationship("Author", back_populates="book_authors")
@@ -62,7 +59,6 @@ class BookAuthor(db.Model):
 
 
 class Book(db.Model):
-    """Thực thể Sách theo Slide 13, 16, 17"""
     __tablename__ = "books"
 
     id = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -79,7 +75,6 @@ class Book(db.Model):
 
     @classmethod
     def from_payload(cls, payload):
-        """Khởi tạo thực thể Book từ JSON payload theo Slide 15"""
         price_val = 0
         if isinstance(payload.get("price"), dict):
             price_val = payload["price"].get("amount", 0)
@@ -98,7 +93,6 @@ class Book(db.Model):
         return book
 
     def to_dict(self, fields=None):
-        """API Representation theo chuẩn Slide 13 & 27 (hỗ trợ sparse fieldsets)"""
         author_list = []
         for ba in self.book_authors:
             author_list.append({
@@ -127,13 +121,11 @@ class Book(db.Model):
         if fields is None:
             return full
 
-        # Xử lý trường hợp chỉ chọn các trường theo query param ?fields=...
         requested_fields = set(f.strip() for f in fields.split(",") if f.strip())
         return {k: v for k, v in full.items() if k in requested_fields or (k == "raw_id" and "id" in requested_fields)}
 
 
 class User(db.Model):
-    """Người dùng hệ thống theo Slide 17"""
     __tablename__ = "users"
 
     id = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -151,11 +143,10 @@ class User(db.Model):
 
 
 class Review(db.Model):
-    """Đánh giá sách theo Slide 9, 12, 17"""
     __tablename__ = "reviews"
 
     id = mapped_column(Integer, primary_key=True, autoincrement=True)
-    rating = mapped_column(Integer, nullable=False)  # 1-5
+    rating = mapped_column(Integer, nullable=False)
     comment = mapped_column(Text, nullable=True)
     book_id = mapped_column(Integer, ForeignKey("books.id", ondelete="CASCADE"), nullable=False)
     user_id = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)

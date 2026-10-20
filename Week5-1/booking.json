@@ -1,0 +1,121 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://api.hotelbooking.com/schemas/booking.schema.json",
+    "title": "Booking",
+    "description": "JSON representation of a Booking reservation resource",
+    "type": "object",
+    "required": [
+        "id",
+        "bookingCode",
+        "userId",
+        "hotelId",
+        "checkInDate",
+        "checkOutDate",
+        "items",
+        "totalPrice",
+        "status",
+        "createdAt"
+    ],
+    "properties": {
+        "id": {
+            "type": "string",
+            "pattern": "^bk_[a-zA-Z0-9]+$"
+        },
+        "bookingCode": {
+            "type": "string",
+            "pattern": "^BK_[0-9]{4}_[A-Z0-9]+$"
+        },
+        "userId": {
+            "type": "string",
+            "pattern": "^user_[a-zA-Z0-9]+$"
+        },
+        "hotelId": {
+            "type": "string",
+            "pattern": "^hotel_[a-zA-Z0-9]+$"
+        },
+        "checkInDate": {
+            "type": "string",
+            "format": "date"
+        },
+        "checkOutDate": {
+            "type": "string",
+            "format": "date"
+        },
+        "items": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "$ref": "#/$defs/bookingItem"
+            }
+        },
+        "totalPrice": {
+            "type": "object",
+            "required": [
+                "amount",
+                "currency"
+            ],
+            "properties": {
+                "amount": {
+                    "type": "number",
+                    "minimum": 0
+                },
+                "currency": {
+                    "type": "string",
+                    "enum": [
+                        "VND",
+                        "USD",
+                        "EUR"
+                    ],
+                    "default": "VND"
+                }
+            }
+        },
+        "status": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "confirmed",
+                "cancelled",
+                "completed"
+            ]
+        },
+        "createdAt": {
+            "type": "string",
+            "format": "date-time"
+        }
+    },
+    "$defs": {
+        "bookingItem": {
+            "type": "object",
+            "required": [
+                "roomTypeId",
+                "roomTypeName",
+                "quantity",
+                "pricePerNight",
+                "nights"
+            ],
+            "properties": {
+                "roomTypeId": {
+                    "type": "string",
+                    "pattern": "^rt_[a-zA-Z0-9]+$"
+                },
+                "roomTypeName": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "pricePerNight": {
+                    "type": "number",
+                    "minimum": 0
+                },
+                "nights": {
+                    "type": "integer",
+                    "minimum": 1
+                }
+            }
+        }
+    },
+    "additionalProperties": false
+}

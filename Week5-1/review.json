@@ -1,0 +1,67 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://api.hotelbooking.com/schemas/review.schema.json",
+    "title": "Review",
+    "description": "JSON representation of a Hotel Review resource",
+    "type": "object",
+    "required": [
+        "id",
+        "hotelId",
+        "author",
+        "rating",
+        "createdAt"
+    ],
+    "properties": {
+        "id": {
+            "type": "string",
+            "pattern": "^rev_[a-zA-Z0-9]+$"
+        },
+        "hotelId": {
+            "type": "string",
+            "pattern": "^hotel_[a-zA-Z0-9]+$"
+        },
+        "author": {
+            "type": "object",
+            "required": [
+                "id",
+                "displayName"
+            ],
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "pattern": "^user_[a-zA-Z0-9]+$"
+                },
+                "displayName": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "avatarUrl": {
+                    "type": "string",
+                    "format": "uri"
+                }
+            }
+        },
+        "rating": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5,
+            "description": "Số điểm đánh giá từ 1 đến 5 sao"
+        },
+        "comment": {
+            "type": "string",
+            "maxLength": 2000
+        },
+        "photos": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "format": "uri"
+            }
+        },
+        "createdAt": {
+            "type": "string",
+            "format": "date-time"
+        }
+    },
+    "additionalProperties": false
+}

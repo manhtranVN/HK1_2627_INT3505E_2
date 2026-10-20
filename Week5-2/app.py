@@ -9,7 +9,6 @@ from seed import seed_database
 def create_app(test_config=None):
     app = Flask(__name__)
 
-    # Cấu hình SQLite database
     base_dir = os.path.dirname(os.path.abspath(__file__))
     db_path = os.path.join(base_dir, "bookstore.db")
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
@@ -21,7 +20,6 @@ def create_app(test_config=None):
 
     db.init_app(app)
 
-    # Đăng ký Blueprints với cả prefix /api/v1/... và /... để tiện cho việc kiểm thử
     app.register_blueprint(books_bp, url_prefix="/api/v1/books")
     app.register_blueprint(books_bp, url_prefix="/books", name="books_direct")
 
@@ -52,7 +50,6 @@ def create_app(test_config=None):
             ]
         })
 
-    # Error handlers chuẩn JSON
     @app.errorhandler(404)
     def handle_404(e):
         return jsonify({"error": "not_found", "message": "Resource không tồn tại"}), 404
@@ -65,7 +62,6 @@ def create_app(test_config=None):
     def handle_500(e):
         return jsonify({"error": "internal_error", "message": "Đã xảy ra lỗi nội bộ máy chủ"}), 500
 
-    # Khởi tạo bảng và nạp dữ liệu mẫu
     with app.app_context():
         db.create_all()
         seed_database()

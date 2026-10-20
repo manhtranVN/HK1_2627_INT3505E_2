@@ -1,7 +1,7 @@
 import os
 import json
 import base64
-from flask import Blueprint, request, jsonify, abort
+from flask import Blueprint, request, jsonify
 from sqlalchemy import select, func, and_, or_
 from jsonschema import validate, ValidationError
 
@@ -16,7 +16,6 @@ try:
 except Exception:
     BOOK_SCHEMA = {}
 
-# Whitelist các trường được phép sắp xếp theo Slide 23 & 27
 ALLOWED_SORT_FIELDS = {
     "id": Book.id,
     "price": Book.price_vnd,
@@ -31,10 +30,6 @@ MAX_LIMIT = 100
 
 
 def parse_sort(raw_sort: str):
-    """
-    Parse chuỗi sort multi-key (ví dụ: '-price,title' hoặc 'price,-id') theo Slide 23 & 27.
-    Luôn tự động tie-break bằng cột 'id' nếu chưa có trong danh sách để đảm bảo tính deterministic.
-    """
     if not raw_sort:
         raw_sort = "-id"
 
@@ -57,7 +52,6 @@ def parse_sort(raw_sort: str):
         if col_name == "id":
             has_id = True
 
-    # Tie-break bằng id nếu chưa có để đảm bảo deterministic pagination (Slide 21 & 23)
     if not has_id:
         last_desc = sort_specs[-1][2] if sort_specs else True
         sort_specs.append(("id", Book.id, last_desc))
@@ -70,21 +64,15 @@ def parse_sort(raw_sort: str):
 
 
 def _enc(data: dict) -> str:
-    """Mã hóa cursor dạng base64url theo Slide 21 & 24"""
     return base64.urlsafe_b64encode(json.dumps(data).encode("utf-8")).decode("utf-8").rstrip("=")
 
 
 def _dec(raw_cursor: str) -> dict:
-    """Giải mã cursor dạng base64url theo Slide 21 & 24"""
     pad = "=" * (-len(raw_cursor) % 4)
     return json.loads(base64.urlsafe_b64decode(raw_cursor + pad).decode("utf-8"))
 
 
 def apply_cursor(q, raw_cursor: str, sort_param: str, sort_specs: list):
-    """
-    Áp dụng điều kiện lọc seek/keyset cho cursor pagination với multi-key sort theo Slide 24 & 25.
-    Hỗ trợ row-value expansion tương thích hoàn hảo mọi DB engine.
-    """
     if not raw_cursor:
         return q, None, 200
 
@@ -93,7 +81,6 @@ def apply_cursor(q, raw_cursor: str, sort_param: str, sort_specs: list):
     except Exception:
         return None, {"error": "bad_cursor", "message": "Cursor không đúng định dạng base64 hợp lệ"}, 400
 
-    # Kiểm tra xem sort trong cursor có khớp với sort hiện tại không (Slide 24: sort_chg)
     if c.get("s") != sort_param:
         return None, {
             "error": "sort_chg",
@@ -107,8 +94,6 @@ def apply_cursor(q, raw_cursor: str, sort_param: str, sort_specs: list):
             "message": "Dữ liệu cursor không khớp với các tiêu chí sắp xếp"
         }, 400
 
-    # Xây dựng điều kiện seek cho N khóa:
-    # (col1 < v1) OR (col1 == v1 AND col2 < v2) OR ...
     conditions = []
     for i in range(len(sort_specs)):
         prefix = [sort_specs[j][1] == vals[j] for j in range(i)]
@@ -123,7 +108,6 @@ def apply_cursor(q, raw_cursor: str, sort_param: str, sort_specs: list):
 
 
 def build_cursor_response(items: list, limit: int, sort_param: str, sort_specs: list, has_more: bool, fields=None):
-    """Đóng gói response theo chiến lược Cursor Pagination (Slide 24 & 25)"""
     next_cursor = None
     if items and has_more:
         last = items[-1]
@@ -159,7 +143,6 @@ def build_cursor_response(items: list, limit: int, sort_param: str, sort_specs: 
 
 
 def build_offset_response(items: list, offset: int, limit: int, total: int, fields=None):
-    """Đóng gói response theo chiến lược Offset Pagination (Slide 20)"""
     page_num = (offset // limit) + 1 if limit else 1
     total_pages = (total + limit - 1) // limit if limit and total > 0 else 1
 
@@ -180,26 +163,17 @@ def build_offset_response(items: list, offset: int, limit: int, total: int, fiel
 
 @bp.get("")
 def list_books():
-    """
-    Endpoint GET /api/v1/books:
-    - Hỗ trợ chọn chiến lược phân trang qua param ?strategy=offset hoặc ?strategy=cursor (Slide 29).
-    - Thêm filter ?genre (Slide 29) và ?category.
-    - Thêm filter phạm vi giá ?price_min=... & ?price_max=... và tình trạng kho ?in_stock=... (Slide 26-27).
-    - Hỗ trợ sort multi-key ?sort=-price,title (Slide 23, 26, 29).
-    - Hỗ trợ field selection ?fields=id,title,price (Slide 26-27).
-    """
     strategy = request.args.get("strategy")
     sort_raw = request.args.get("sort", "-id")
     limit_raw = request.args.get("limit", DEFAULT_LIMIT, type=int)
     limit = min(max(1, limit_raw if limit_raw is not None else DEFAULT_LIMIT), MAX_LIMIT)
     fields = request.args.get("fields")
 
-    # Xác định chiến lược phân trang:
     if strategy is None:
         if "offset" in request.args or "page" in request.args:
             strategy = "offset"
         else:
-            strategy = "cursor"  # Mặc định cursor theo Slide 22 & 29
+            strategy = "cursor"
 
     if strategy not in ("offset", "cursor"):
         return jsonify({
@@ -207,15 +181,12 @@ def list_books():
             "message": f"Chiến lược '{strategy}' không hợp lệ. Chỉ chấp nhận 'offset' hoặc 'cursor'."
         }), 400
 
-    # Parse và validate sort đa khóa
     sort_specs, order_by_cols, sort_err, sort_code = parse_sort(sort_raw)
     if sort_err:
         return jsonify({"error": "bad_sort", "message": sort_err}), sort_code
 
-    # Khởi tạo query
     q = select(Book)
 
-    # Filter theo ?genre=... hoặc ?category=... (Slide 26, 27, 29)
     genre_param = request.args.get("genre")
     category_param = request.args.get("category")
 
@@ -230,7 +201,6 @@ def list_books():
                 Category.name.ilike(f"%{target}%")
             ))
 
-    # Filter phạm vi giá ?price_min & ?price_max
     price_min = request.args.get("price_min", type=int)
     price_max = request.args.get("price_max", type=int)
     if price_min is not None:
@@ -238,7 +208,6 @@ def list_books():
     if price_max is not None:
         q = q.filter(Book.price_vnd <= price_max)
 
-    # Filter ?in_stock=true/false
     in_stock = request.args.get("in_stock")
     if in_stock is not None:
         if in_stock.lower() in ("true", "1", "yes"):
@@ -246,9 +215,7 @@ def list_books():
         elif in_stock.lower() in ("false", "0", "no"):
             q = q.filter(Book.stock == 0)
 
-    # Xử lý theo Strategy đã chọn
     if strategy == "offset":
-        # Hỗ trợ cả ?offset=... và ?page=...
         offset = request.args.get("offset", type=int)
         page = request.args.get("page", type=int)
         if offset is None:
@@ -258,7 +225,6 @@ def list_books():
                 offset = 0
         offset = max(0, offset)
 
-        # Tính tổng số bản ghi thoả mãn điều kiện
         count_q = select(func.count(Book.id))
         if genre_param or category_param:
             target = (genre_param or category_param).strip()
@@ -282,22 +248,18 @@ def list_books():
 
         total = db.session.scalar(count_q) or 0
 
-        # Query trang dữ liệu
         q = q.order_by(*order_by_cols).offset(offset).limit(limit)
         rows = db.session.scalars(q).unique().all()
         return build_offset_response(rows, offset, limit, total, fields=fields)
 
     else:
-        # Cursor Strategy
         cursor_param = request.args.get("cursor")
         q = q.order_by(*order_by_cols)
 
-        # Áp dụng seek condition từ cursor
         q, cursor_err, cursor_code = apply_cursor(q, cursor_param, sort_raw, sort_specs)
         if cursor_err:
             return jsonify(cursor_err), cursor_code
 
-        # +1 trick để kiểm tra còn dữ liệu cho trang tiếp hay không
         rows = db.session.scalars(q.limit(limit + 1)).unique().all()
         has_more = len(rows) > limit
         items = rows[:limit]
@@ -307,15 +269,10 @@ def list_books():
 
 @bp.post("")
 def create_book():
-    """
-    POST /api/v1/books:
-    Tạo sách mới với validate JSON Schema theo Slide 14 & 15.
-    """
     payload = request.get_json(silent=True)
     if payload is None:
         return jsonify({"error": "validation_failed", "message": "Body phải là định dạng JSON hợp lệ"}), 400
 
-    # Validate bằng jsonschema
     if BOOK_SCHEMA:
         try:
             validate(payload, BOOK_SCHEMA)
@@ -326,7 +283,6 @@ def create_book():
                 "message": e.message
             }), 400
 
-    # Kiểm tra ISBN trùng lặp nếu có
     if payload.get("isbn"):
         existing = db.session.scalar(select(Book).where(Book.isbn == payload["isbn"]))
         if existing:
@@ -335,7 +291,6 @@ def create_book():
                 "message": f"Cuốn sách với ISBN {payload['isbn']} đã tồn tại"
             }), 409
 
-    # Nếu có genre truyền dạng string thay vì category_id
     cat_id = payload.get("category_id")
     if not cat_id and payload.get("genre"):
         cat = db.session.scalar(select(Category).where(Category.slug == payload["genre"].lower()))
@@ -347,7 +302,6 @@ def create_book():
     db.session.add(book)
     db.session.flush()
 
-    # Thêm quan hệ tác giả nếu có trong payload
     if "authors" in payload and isinstance(payload["authors"], list):
         for item in payload["authors"]:
             aid = item.get("author_id")
@@ -367,7 +321,6 @@ def create_book():
 
 @bp.get("/<int:book_id>")
 def get_book(book_id):
-    """GET /api/v1/books/<id>: Xem chi tiết 1 cuốn sách"""
     book = db.session.get(Book, book_id)
     if not book:
         return jsonify({"error": "not_found", "message": f"Không tìm thấy sách với ID {book_id}"}), 404
@@ -377,7 +330,6 @@ def get_book(book_id):
 
 @bp.put("/<int:book_id>")
 def update_book(book_id):
-    """PUT /api/v1/books/<id>: Cập nhật toàn bộ thông tin sách"""
     book = db.session.get(Book, book_id)
     if not book:
         return jsonify({"error": "not_found", "message": f"Không tìm thấy sách với ID {book_id}"}), 404
@@ -412,7 +364,6 @@ def update_book(book_id):
 
 @bp.patch("/<int:book_id>")
 def patch_book(book_id):
-    """PATCH /api/v1/books/<id>: Cập nhật từng phần cuốn sách"""
     book = db.session.get(Book, book_id)
     if not book:
         return jsonify({"error": "not_found", "message": f"Không tìm thấy sách với ID {book_id}"}), 404
@@ -440,7 +391,6 @@ def patch_book(book_id):
 
 @bp.delete("/<int:book_id>")
 def delete_book(book_id):
-    """DELETE /api/v1/books/<id>: Xóa cuốn sách theo ID"""
     book = db.session.get(Book, book_id)
     if not book:
         return jsonify({"error": "not_found", "message": f"Không tìm thấy sách với ID {book_id}"}), 404
@@ -449,11 +399,8 @@ def delete_book(book_id):
     return "", 204
 
 
-# --- Nested Sub-resources: Authors (Slide 10, 11, 12) ---
-
 @bp.get("/<int:book_id>/authors")
 def list_book_authors(book_id):
-    """GET /api/v1/books/<id>/authors: Danh sách tác giả của sách theo Slide 11"""
     book = db.session.get(Book, book_id)
     if not book:
         return jsonify({"error": "not_found", "message": f"Không tìm thấy sách với ID {book_id}"}), 404
@@ -472,7 +419,6 @@ def list_book_authors(book_id):
 
 @bp.post("/<int:book_id>/authors")
 def add_book_author(book_id):
-    """POST /api/v1/books/<id>/authors: Thêm tác giả cho sách theo Slide 11"""
     book = db.session.get(Book, book_id)
     if not book:
         return jsonify({"error": "not_found", "message": f"Không tìm thấy sách với ID {book_id}"}), 404
@@ -501,7 +447,6 @@ def add_book_author(book_id):
 
 @bp.delete("/<int:book_id>/authors/<int:author_id>")
 def remove_book_author(book_id, author_id):
-    """DELETE /api/v1/books/<id>/authors/<author_id>: Xóa tác giả khỏi sách theo Slide 11"""
     ba = db.session.get(BookAuthor, (book_id, author_id))
     if not ba:
         return jsonify({"error": "not_found", "message": "Không tìm thấy quan hệ tác giả - sách này"}), 404
@@ -511,11 +456,8 @@ def remove_book_author(book_id, author_id):
     return "", 204
 
 
-# --- Nested Sub-resources: Reviews (Slide 9 & 12) ---
-
 @bp.get("/<int:book_id>/reviews")
 def list_book_reviews(book_id):
-    """GET /api/v1/books/<id>/reviews: Danh sách đánh giá của sách theo Slide 9 & 12"""
     book = db.session.get(Book, book_id)
     if not book:
         return jsonify({"error": "not_found", "message": f"Không tìm thấy sách với ID {book_id}"}), 404

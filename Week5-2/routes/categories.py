@@ -6,13 +6,11 @@ bp = Blueprint("categories", __name__)
 
 @bp.get("")
 def list_categories():
-    """GET /api/v1/categories: Danh sách tất cả các thể loại/genre"""
     cats = db.session.scalars(select(Category).order_by(Category.id.asc())).all()
     return jsonify([c.to_dict() for c in cats]), 200
 
 @bp.post("")
 def create_category():
-    """POST /api/v1/categories: Tạo thể loại mới"""
     data = request.get_json(silent=True) or {}
     if not data.get("name") or not data.get("slug"):
         return jsonify({"error": "bad_request", "message": "name và slug là bắt buộc"}), 400
@@ -28,7 +26,6 @@ def create_category():
 
 @bp.get("/<int:cat_id>")
 def get_category(cat_id):
-    """GET /api/v1/categories/<id>: Xem chi tiết 1 thể loại"""
     cat = db.session.get(Category, cat_id)
     if not cat:
         return jsonify({"error": "not_found", "message": f"Không tìm thấy thể loại ID {cat_id}"}), 404

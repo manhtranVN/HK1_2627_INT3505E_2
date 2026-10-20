@@ -2,11 +2,9 @@ from datetime import datetime, timezone, timedelta
 from models import db, Category, Author, Book, BookAuthor, User, Review
 
 def seed_database():
-    """Tạo dữ liệu mẫu đa dạng cho bookstore-api phục vụ kiểm thử phân trang, lọc và sắp xếp"""
     if db.session.scalar(db.select(db.func.count(Category.id))) > 0:
         return
 
-    # 1. Thể loại (Genres / Categories)
     cats = [
         Category(name="Công nghệ thông tin", slug="tech"),
         Category(name="Khoa học", slug="science"),
@@ -19,7 +17,6 @@ def seed_database():
 
     cat_map = {c.slug: c.id for c in cats}
 
-    # 2. Tác giả (Authors)
     authors = [
         Author(name="Robert C. Martin", bio="Tác giả nổi tiếng về Clean Code và Clean Architecture."),
         Author(name="Martin Fowler", bio="Chuyên gia về kiến trúc phần mềm và Refactoring."),
@@ -37,7 +34,6 @@ def seed_database():
 
     author_map = {a.name: a.id for a in authors}
 
-    # 3. Người dùng (Users)
     users = [
         User(email="an.nguyen@example.com", display_name="Nguyễn Văn An"),
         User(email="binh.tran@example.com", display_name="Trần Thị Bình"),
@@ -46,40 +42,34 @@ def seed_database():
     db.session.add_all(users)
     db.session.flush()
 
-    # 4. Danh sách 25 cuốn sách với giá trùng nhau để kiểm thử tie-break
     now = datetime.now(timezone.utc)
     raw_books = [
-        # Tech books
         ("Clean Code", "9780132350884", 350000, 15, cat_map["tech"], [("Robert C. Martin", "lead")]),
         ("Clean Architecture", "9780134494166", 420000, 20, cat_map["tech"], [("Robert C. Martin", "lead")]),
         ("The Pragmatic Programmer", "9780201616224", 350000, 12, cat_map["tech"], [("Andrew Hunt", "lead"), ("David Thomas", "co")]),
         ("Refactoring", "9780201485677", 450000, 8, cat_map["tech"], [("Martin Fowler", "lead")]),
         ("Domain-Driven Design", "9780321125217", 480000, 5, cat_map["tech"], [("Eric Evans", "lead")]),
         ("Patterns of Enterprise Application Architecture", "9780321127426", 520000, 7, cat_map["tech"], [("Martin Fowler", "lead")]),
-        ("Clean Craftsmanship", "9780136921837", 350000, 0, cat_map["tech"], [("Robert C. Martin", "lead")]), # out of stock
+        ("Clean Craftsmanship", "9780136921837", 350000, 0, cat_map["tech"], [("Robert C. Martin", "lead")]),
         ("Extreme Programming Explained", "9780201616415", 300000, 10, cat_map["tech"], [("Martin Fowler", "co")]),
         ("The Clean Coder", "9780137081073", 350000, 18, cat_map["tech"], [("Robert C. Martin", "lead")]),
 
-        # Science books
         ("Cosmos", "9780345331359", 250000, 25, cat_map["science"], [("Carl Sagan", "lead")]),
         ("Pale Blue Dot", "9780345376596", 260000, 14, cat_map["science"], [("Carl Sagan", "lead")]),
         ("A Brief History of Time", "9780553380163", 220000, 30, cat_map["science"], [("Stephen Hawking", "lead")]),
         ("The Grand Design", "9780553384666", 250000, 11, cat_map["science"], [("Stephen Hawking", "lead")]),
         ("The Demon-Haunted World", "9780345409461", 270000, 9, cat_map["science"], [("Carl Sagan", "lead")]),
 
-        # Fiction books
         ("1984", "9780451524935", 150000, 50, cat_map["fiction"], [("George Orwell", "lead")]),
         ("Animal Farm", "9780451526342", 120000, 45, cat_map["fiction"], [("George Orwell", "lead")]),
         ("Homage to Catalonia", "9780156421171", 180000, 10, cat_map["fiction"], [("George Orwell", "lead")]),
         ("Burmese Days", "9780156148504", 170000, 6, cat_map["fiction"], [("George Orwell", "lead")]),
 
-        # Business books
         ("Zero to One", "9780804139297", 200000, 35, cat_map["business"], [("Peter Thiel", "lead")]),
         ("Sapiens: A Brief History of Humankind", "9780062316097", 320000, 40, cat_map["business"], [("Yuval Noah Harari", "lead")]),
         ("Homo Deus: A Brief History of Tomorrow", "9780062464316", 330000, 22, cat_map["business"], [("Yuval Noah Harari", "lead")]),
         ("21 Lessons for the 21st Century", "9780525512172", 310000, 19, cat_map["business"], [("Yuval Noah Harari", "lead")]),
 
-        # Psychology books
         ("Thinking, Fast and Slow", "9780374533557", 290000, 28, cat_map["psychology"], []),
         ("Atomic Habits", "9780735211292", 210000, 60, cat_map["psychology"], []),
         ("Deep Work", "9781455586691", 230000, 16, cat_map["psychology"], []),
@@ -103,7 +93,6 @@ def seed_database():
                 ba = BookAuthor(book_id=book.id, author_id=aid, role=role)
                 db.session.add(ba)
 
-    # 5. Reviews mẫu
     clean_code_book = db.session.scalar(db.select(Book).where(Book.title == "Clean Code"))
     if clean_code_book and users:
         db.session.add_all([
