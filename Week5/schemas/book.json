@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BookSchema",
+  "type": "object",
+  "required": ["title", "price"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^book_[a-z0-9]+$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "isbn": {
+      "type": "string",
+      "pattern": "^\\d{13}$"
+    },
+    "category_id": {
+      "type": "integer"
+    },
+    "genre": {
+      "type": "string"
+    },
+    "price": {
+      "type": "object",
+      "required": ["amount"],
+      "properties": {
+        "amount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "currency": {
+          "type": "string",
+          "enum": ["VND", "USD", "EUR"]
+        }
+      }
+    },
+    "stock": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "authors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/author"
+      }
+    }
+  },
+  "$defs": {
+    "author": {
+      "type": "object",
+      "required": ["author_id"],
+      "properties": {
+        "author_id": {
+          "type": "integer"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["lead", "co", "ed"]
+        }
+      }
+    }
+  }
+}

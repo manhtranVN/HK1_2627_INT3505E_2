@@ -1,0 +1,367 @@
+{
+  "info": {
+    "_postman_id": "b3e5f2a1-8d2a-4c3e-9f1b-20261020week5",
+    "name": "Week 5 - Bookstore API (Pagination, Filtering, Sorting)",
+    "description": "Postman Collection hoàn chỉnh cho Bài tập 2 - Tuần 5: Data Modeling and Resource Design.\nBao gồm: Offset pagination, Cursor pagination, Filter ?genre, Sort multi-key, JSON Schema validation, Sub-resources.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Offset Pagination",
+      "item": [
+        {
+          "name": "GET /api/v1/books (Offset - Trang 1: offset=0, limit=5)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/books?strategy=offset&offset=0&limit=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "books"],
+              "query": [
+                {"key": "strategy", "value": "offset"},
+                {"key": "offset", "value": "0"},
+                {"key": "limit", "value": "5"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/books (Offset - Trang 2: offset=5, limit=5)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/books?strategy=offset&offset=5&limit=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "books"],
+              "query": [
+                {"key": "strategy", "value": "offset"},
+                {"key": "offset", "value": "5"},
+                {"key": "limit", "value": "5"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/books (Offset - Jump to page 3: page=3&limit=5)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/books?strategy=offset&page=3&limit=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "books"],
+              "query": [
+                {"key": "strategy", "value": "offset"},
+                {"key": "page", "value": "3"},
+                {"key": "limit", "value": "5"}
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Cursor Pagination",
+      "item": [
+        {
+          "name": "GET /api/v1/books (Cursor - Trang 1 mặc định: limit=5)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/books?strategy=cursor&limit=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "books"],
+              "query": [
+                {"key": "strategy", "value": "cursor"},
+                {"key": "limit", "value": "5"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/books (Cursor - Trang 2 với cursor)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/books?strategy=cursor&limit=5&cursor=eyJzIjogIi1pZCIsICJ2IjogWzIxXX0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "books"],
+              "query": [
+                {"key": "strategy", "value": "cursor"},
+                {"key": "limit", "value": "5"},
+                {"key": "cursor", "value": "eyJzIjogIi1pZCIsICJ2IjogWzIxXX0"}
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Filtering & Searching",
+      "item": [
+        {
+          "name": "GET /api/v1/books (Lọc thể loại ?genre=tech)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/books?genre=tech&strategy=offset",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "books"],
+              "query": [
+                {"key": "genre", "value": "tech"},
+                {"key": "strategy", "value": "offset"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/books (Lọc thể loại ?genre=fiction)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/books?genre=fiction&strategy=offset",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "books"],
+              "query": [
+                {"key": "genre", "value": "fiction"},
+                {"key": "strategy", "value": "offset"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/books (Lọc khoảng giá ?price_min & ?price_max)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/books?price_min=200000&price_max=350000&strategy=offset",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "books"],
+              "query": [
+                {"key": "price_min", "value": "200000"},
+                {"key": "price_max", "value": "350000"},
+                {"key": "strategy", "value": "offset"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/books (Lọc sách còn hàng ?in_stock=true)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/books?in_stock=true&strategy=offset",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "books"],
+              "query": [
+                {"key": "in_stock", "value": "true"},
+                {"key": "strategy", "value": "offset"}
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Sorting (Single-key & Multi-key)",
+      "item": [
+        {
+          "name": "GET /api/v1/books (Sort giá tăng dần ?sort=price)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/books?sort=price&limit=5&strategy=offset",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "books"],
+              "query": [
+                {"key": "sort", "value": "price"},
+                {"key": "limit", "value": "5"},
+                {"key": "strategy", "value": "offset"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/books (Sort đa khóa ?sort=-price,title)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/books?sort=-price,title&limit=10&strategy=offset",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "books"],
+              "query": [
+                {"key": "sort", "value": "-price,title"},
+                {"key": "limit", "value": "10"},
+                {"key": "strategy", "value": "offset"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/books (Cursor pagination với Multi-key sort ?sort=-price,title)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/books?strategy=cursor&limit=5&sort=-price,title",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "books"],
+              "query": [
+                {"key": "strategy", "value": "cursor"},
+                {"key": "limit", "value": "5"},
+                {"key": "sort", "value": "-price,title"}
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Field Selection & Error Handling",
+      "item": [
+        {
+          "name": "GET /api/v1/books (Sparse fieldsets ?fields=id,title,price)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/books?fields=id,title,price&limit=3",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "books"],
+              "query": [
+                {"key": "fields", "value": "id,title,price"},
+                {"key": "limit", "value": "3"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/books (Lỗi 400 - Sort không hợp lệ)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/books?sort=invalid_col",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "books"],
+              "query": [
+                {"key": "sort", "value": "invalid_col"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/books (Lỗi 400 - Đổi sort khi đang dùng cursor)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/books?strategy=cursor&sort=-price&cursor=eyJzIjogIi1pZCIsICJ2IjogWzIxXX0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "books"],
+              "query": [
+                {"key": "strategy", "value": "cursor"},
+                {"key": "sort", "value": "-price"},
+                {"key": "cursor", "value": "eyJzIjogIi1pZCIsICJ2IjogWzIxXX0"}
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. CRUD & Sub-resources",
+      "item": [
+        {
+          "name": "POST /api/v1/books (Tạo sách với JSON Schema)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Designing Data-Intensive Applications\",\n  \"isbn\": \"9781449373320\",\n  \"price\": {\n    \"amount\": 650000,\n    \"currency\": \"VND\"\n  },\n  \"stock\": 20,\n  \"category_id\": 1,\n  \"authors\": [\n    {\n      \"author_id\": 2,\n      \"role\": \"lead\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/books",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "books"]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/books/:id (Xem chi tiết)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/books/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "books", "1"]
+            }
+          }
+        },
+        {
+          "name": "GET /api/v1/books/:id/authors (Sub-resource tác giả)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/books/1/authors",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "books", "1", "authors"]
+            }
+          }
+        },
+        {
+          "name": "POST /api/v1/books/:id/authors (Thêm tác giả)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"author_id\": 3,\n  \"role\": \"co\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/books/1/authors",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "books", "1", "authors"]
+            }
+          }
+        },
+        {
+          "name": "DELETE /api/v1/books/:id/authors/:aid (Gỡ tác giả)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/books/1/authors/3",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "books", "1", "authors", "3"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
