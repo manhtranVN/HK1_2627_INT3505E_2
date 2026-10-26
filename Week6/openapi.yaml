@@ -1,0 +1,669 @@
+openapi: 3.0.3
+info:
+  title: Social Network API - Authentication & Posts Service
+  version: 1.0.0
+  summary: Social Network REST API with JWT Authentication, OAuth 2.0 Scopes, and BOLA Protection
+  description: >
+    ## Khái quát Đặc tả API Mạng Xã Hội (Social Network API)
+    
+    Tài liệu OpenAPI 3.0.3 này đặc tả 3 endpoints cốt lõi cho hệ thống mạng xã hội theo yêu cầu Buổi 06:
+    1. `POST /auth/login`: Xác thực danh tính người dùng (AuthN), cấp cặp JWT Access Token và Refresh Token.
+    2. `POST /auth/refresh`: Gia hạn Access Token khi token cũ hết hạn (Refresh Token Flow & Rotation).
+    3. `GET /posts/{id}`: Truy xuất thông tin bài viết theo định danh với cơ chế bảo vệ 3 lớp: AuthN -> AuthZ Scope (`posts:read`) -> Quyền đối tượng (BOLA Protection).
+    
+    ---
+    ### Trả lời 3 câu hỏi bắt buộc theo đề bài:
+    
+    #### 1. Mỗi endpoint cần scope nào?
+    * **`POST /auth/login`**:
+      * **Scope yêu cầu:** Không yêu cầu (`None`). Đây là endpoint công khai (Public).
+      * **Phân quyền trong token trả về:** Sau khi xác thực thành công, máy chủ cấp Access Token chứa danh sách claims `scopes` dựa trên vai trò của người dùng:
+        * Người dùng thông thường (`user`): `["posts:read", "posts:write", "profile:read"]`
+        * Quản trị viên (`admin`): `["posts:read", "posts:write", "posts:moderate", "profile:read", "admin"]`
+    * **`POST /auth/refresh`**:
+      * **Scope yêu cầu:** Không dùng Bearer Access Token thông thường. Yêu cầu **Refresh Token** hợp lệ được chuyển qua header `Authorization: Bearer <refresh_token>` hoặc trường `refresh_token` trong request body.
+      * Token phải có claim `type: "refresh"` (nếu client gửi nhầm Access Token sẽ bị từ chối với lỗi `403 Forbidden`).
+    * **`GET /posts/{id}`**:
+      * **Scope yêu cầu:** Bắt buộc phải có scope **`posts:read`** trong Access Token.
+      * **Kiểm tra quyền đối tượng (Ownership / BOLA Check):**
+        * Nếu bài viết ở chế độ `public`: Mọi token có scope `posts:read` đều đọc được.
+        * Nếu bài viết ở chế độ `friends_only`: Chỉ tác giả bài viết hoặc tài khoản nằm trong danh sách bạn bè của tác giả mới đọc được.
+        * Nếu bài viết ở chế độ `private`: Chỉ chính tác giả (`author_id == current_user.id`) hoặc tài khoản có role `admin`/`moderator` mới được phép truy cập.
+    
+    #### 2. Lỗi nào có thể xảy ra?
+    * **`POST /auth/login`**:
+      * `400 Bad Request`: Payload JSON không hợp lệ, cú pháp sai hoặc thiếu trường bắt buộc (`email`, `password`).
+      * `401 Unauthorized`: Sai thông tin đăng nhập (`invalid_credentials`) hoặc tài khoản bị khóa (`account_disabled`). Trả về thông báo lỗi chung không tiết lộ email có tồn tại hay không.
+      * `422 Unprocessable Content`: Email sai định dạng RFC 5322 hoặc mật khẩu không đạt độ dài tối thiểu.
+      * `429 Too Many Requests`: Vượt quá giới hạn thử đăng nhập (Rate limit: tối đa 5 lần thử sai / phút trên cùng IP hoặc email nhằm chống Brute-Force / Credential Stuffing).
+      * `500 Internal Server Error`: Lỗi máy chủ hoặc cơ sở dữ liệu nội bộ.
+    * **`POST /auth/refresh`**:
+      * `400 Bad Request`: Thiếu token trong header/body hoặc cú pháp request không hợp lệ.
+      * `401 Unauthorized`: Refresh token hết hạn (`token_expired`), chữ ký không khớp (`invalid_signature`), token bị thu hồi trong danh sách đen (`token_revoked`), hoặc không tồn tại trong phiên hoạt động.
+      * `403 Forbidden`: Gửi nhầm Access Token thay vì Refresh Token (`invalid_token_type`), hoặc tài khoản bị vô hiệu hóa (`account_suspended`).
+      * `429 Too Many Requests`: Vượt quá tần suất refresh token cho phép.
+      * `500 Internal Server Error`: Lỗi máy chủ nội bộ.
+    * **`GET /posts/{id}`**:
+      * `400 Bad Request`: Tham số `{id}` trên đường dẫn không hợp lệ (không phải số nguyên dương).
+      * `401 Unauthorized`: Thiếu header `Authorization`, token hết hạn (`token_expired`), token bị thu hồi (`token_revoked`), hoặc chữ ký token giả mạo (`invalid_token`).
+      * `403 Forbidden`: Token thiếu scope `posts:read` (`insufficient_scope`), HOẶC vi phạm kiểm soát quyền đối tượng (BOLA) khi cố gắng xem bài viết riêng tư của người khác.
+      * `404 Not Found`: Không tìm thấy bài viết (`post_not_found`), hoặc trả về 404 đối với bài viết riêng tư theo chính sách chống rò rỉ sự tồn tại của ID (Anti-Enumeration).
+      * `429 Too Many Requests`: Gửi request vượt ngưỡng rate limit.
+      * `500 Internal Server Error`: Lỗi máy chủ nội bộ.
+    
+    #### 3. Status code nào được trả?
+    * `POST /auth/login`: `200`, `400`, `401`, `422`, `429`, `500`
+    * `POST /auth/refresh`: `200`, `400`, `401`, `403`, `429`, `500`
+    * `GET /posts/{id}`: `200`, `400`, `401`, `403`, `404`, `429`, `500`
+    
+    Mọi phản hồi lỗi đều tuân thủ định dạng chuẩn **RFC 7807 (Problem Details for HTTP APIs)**.
+  contact:
+    name: Backend Security Team
+    email: security@socialnetwork.example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:5000/api/v1
+    description: Máy chủ phát triển cục bộ (Local Development Server)
+  - url: https://api.socialnetwork.example.com/v1
+    description: Máy chủ môi trường sản xuất (Production Server với TLS 1.3)
+
+tags:
+  - name: Authentication
+    description: Các endpoint quản lý xác thực danh tính người dùng và cấp phát JWT
+  - name: Posts
+    description: Các endpoint quản lý và truy xuất bài viết mạng xã hội
+
+paths:
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Xác thực người dùng và cấp cặp token (Access + Refresh Token)
+      description: >
+        Nhận thông tin đăng nhập của người dùng (`email` và `password`), xác minh mật khẩu
+        bằng thuật toán băm an toàn **Argon2id**. Nếu hợp lệ, trả về một cặp JWT gồm:
+        - **Access Token:** Có thời hạn ngắn (15 phút = 900 giây), chứa định danh người dùng (`sub`), vai trò (`roles`), danh sách quyền (`scopes`), mã định danh token (`jti`).
+        - **Refresh Token:** Có thời hạn dài (30 ngày = 2,592,000 giây), chỉ dùng để xin cấp mới Access Token tại endpoint `/auth/refresh`.
+        
+        **Bảo mật:**
+        - Sử dụng thông báo lỗi chung khi xác thực thất bại để chống tấn công dò tìm tài khoản (User Enumeration).
+        - Thực hiện dummy password hash khi email không tồn tại nhằm đồng nhất thời gian xử lý, chống tấn công qua kênh kề về thời gian (Timing Attack).
+        - Áp dụng Rate Limiting tối đa 5 lần thử sai / phút.
+      operationId: loginUser
+      security: [] # Public endpoint - không yêu cầu xác thực trước
+      requestBody:
+        required: true
+        description: Thông tin đăng nhập của người dùng
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: "alice@example.com"
+              password: "AliceSecurePass123!"
+      responses:
+        '200':
+          description: Đăng nhập thành công, trả về Access Token và Refresh Token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+              example:
+                access_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwicm9sZXMiOlsidXNlciJdLCJzY29wZXMiOlsicG9zdHM6cmVhZCIscG9zdHM6d3JpdGUiLCJwcm9maWxlOnJlYWQiXSwianRpIjoiN2Y0MGM4ZDAtYjJhZi00ZGRjLTlhOWItMTIzNDU2Nzg5YWJjIiwiaWF0IjoxNzI5OTM2MDAwLCJleHAiOjE3Mjk5MzY5MDB9.SIGNATURE"
+                refresh_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwidHlwZSI6InJlZnJlc2giLCJqdGkiOiJkZTY1NDMyMS05OGJjLTRlZmEtYmNkZS05ODc2NTQzMjFmZWQiLCJpYXQiOjE3Mjk5MzYwMDAsImV4cCI6MTczMjUyODAwMH0.SIGNATURE"
+                token_type: "Bearer"
+                expires_in: 900
+                refresh_expires_in: 2592000
+                scopes:
+                  - "posts:read"
+                  - "posts:write"
+                  - "profile:read"
+                user:
+                  id: 1
+                  username: "alice"
+                  email: "alice@example.com"
+                  full_name: "Alice Nguyen"
+                  avatar_url: "https://avatar.socialnetwork.example.com/alice.png"
+                  role: "user"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Gia hạn JWT Access Token bằng Refresh Token
+      description: >
+        Nhận một **Refresh Token** còn hiệu lực, kiểm tra token chưa bị đưa vào danh sách đen (Blacklist / Revocation store),
+        và cấp phát một Access Token mới.
+        
+        **Cơ chế Refresh Token Rotation:**
+        - Để ngăn chặn rủi ro Token Replay, mỗi khi Refresh Token được sử dụng thành công, máy chủ có thể thu hồi Refresh Token cũ và cấp Refresh Token mới (Rotating).
+        - Nếu một Refresh Token đã bị thu hồi cố gắng gửi lại, hệ thống sẽ phát hiện hành vi tái sử dụng trái phép và lập tức vô hiệu hóa toàn bộ chuỗi token (Family Invalidation) liên quan đến tài khoản đó.
+        
+        **Yêu cầu Scope & Loại Token:**
+        - Bắt buộc token gửi lên phải là Refresh Token (`type: "refresh"`). Gửi Access Token sẽ bị chặn với mã lỗi `403 Forbidden`.
+      operationId: refreshAccessToken
+      security:
+        - refreshBearerAuth: []
+      requestBody:
+        required: false
+        description: Tùy chọn gửi refresh token trong body nếu không dùng header Authorization
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+            example:
+              refresh_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwidHlwZSI6InJlZnJlc2giLCJqdGkiOiJkZTY1NDMyMS05OGJjLTRlZmEtYmNkZS05ODc2NTQzMjFmZWQiLCJpYXQiOjE3Mjk5MzYwMDAsImV4cCI6MTczMjUyODAwMH0.SIGNATURE"
+      responses:
+        '200':
+          description: Gia hạn thành công, trả về Access Token mới và Refresh Token xoay vòng (nếu áp dụng rotation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshResponse'
+              example:
+                access_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwicm9sZXMiOlsidXNlciJdLCJzY29wZXMiOlsicG9zdHM6cmVhZCIscG9zdHM6d3JpdGUiLCJwcm9maWxlOnJlYWQiXSwianRpIjoiMWEyYjNjNGQtNWU2Zi03YThiLTljMGQtMWUyZjNhNGI1YzZkIiwiaWF0IjoxNzI5OTM2OTAwLCJleHAiOjE3Mjk5Mzc4MDB9.SIGNATURE"
+                refresh_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwidHlwZSI6InJlZnJlc2giLCJqdGkiOiI5ZjhlN2Q2Yy01YjRhLTNmMmUtMWQyYy0zYjRhNWY2ZTdkOGMiLCJpYXQiOjE3Mjk5MzY5MDAsImV4cCI6MTczMjUzMDkwMH0.SIGNATURE"
+                token_type: "Bearer"
+                expires_in: 900
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /posts/{id}:
+    get:
+      tags:
+        - Posts
+      summary: "Lấy chi tiết bài viết theo ID (Bảo vệ 3 lớp: AuthN, Scope, BOLA)"
+      description: >
+        Truy xuất thông tin chi tiết của một bài viết cụ thể dựa trên `{id}`.
+        
+        ### Quy trình kiểm soát bảo mật 3 lớp bắt buộc:
+        1. **Lớp 1 - Authentication (AuthN):**
+           - Kiểm tra request có mang Access Token hợp lệ qua header `Authorization: Bearer <access_token>`.
+           - Xác minh chữ ký số (Signature), thời hạn hiệu lực (`exp`), và kiểm tra `jti` không nằm trong danh sách đen (`revoked_tokens`).
+           - Nếu thiếu token hoặc token không hợp lệ -> trả về `401 Unauthorized`.
+        2. **Lớp 2 - Authorization Scope (AuthZ Scope):**
+           - Trích xuất claims từ token và kiểm tra claim `scopes` có chứa quyền **`posts:read`** hay không.
+           - Nếu thiếu scope -> từ chối với `403 Forbidden` (`need_all_of: ["posts:read"]`).
+        3. **Lớp 3 - Object-Level Authorization (Chống BOLA - OWASP API1:2023):**
+           - Truy vấn bài viết từ cơ sở dữ liệu theo `{id}`. Nếu bài viết không tồn tại -> trả về `404 Not Found`.
+           - Kiểm tra chính sách truy cập đối tượng:
+             * **Public:** Mọi người dùng đã xác thực đều có thể đọc.
+             * **Friends Only:** Chỉ tác giả hoặc những người dùng là bạn bè của tác giả mới có thể đọc.
+             * **Private:** Chỉ chính tác giả (`author_id == current_user_id`) hoặc người dùng có vai trò quản trị (`admin`, `moderator`) mới được xem.
+           - Nếu người dùng không thỏa mãn chính sách bảo vệ bài viết riêng tư, hệ thống sẽ trả về **`403 Forbidden`** (hoặc `404 Not Found` để ngăn kẻ tấn công brute-force ID dò tìm sự tồn tại của bài viết bí mật).
+      operationId: getPostById
+      security:
+        - bearerAuth: []
+        - oauth2:
+            - posts:read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Định danh duy nhất của bài viết (số nguyên dương)
+          schema:
+            type: integer
+            minimum: 1
+            example: 101
+      responses:
+        '200':
+          description: Lấy bài viết thành công.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostResponse'
+              example:
+                id: 101
+                author:
+                  id: 1
+                  username: "alice"
+                  full_name: "Alice Nguyen"
+                  avatar_url: "https://avatar.socialnetwork.example.com/alice.png"
+                content: "Hôm nay tôi hoàn thành bài lab bảo mật API về JWT và RBAC! #learning #security"
+                media_urls:
+                  - "https://cdn.socialnetwork.example.com/photos/post-101.jpg"
+                visibility: "public"
+                tags:
+                  - "learning"
+                  - "security"
+                likes_count: 42
+                comments_count: 7
+                created_at: "2026-10-26T08:30:00Z"
+                updated_at: "2026-10-26T08:30:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        Sử dụng JWT Access Token có thời hạn ngắn (15 phút).
+        Gửi trong header: `Authorization: Bearer <access_token>`.
+        Payload chứa các claims tiêu chuẩn: `sub` (User ID), `roles`, `scopes`, `jti`, `iat`, `exp`.
+    
+    refreshBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        Sử dụng JWT Refresh Token có thời hạn dài (30 ngày).
+        Dành riêng cho endpoint `/auth/refresh`.
+        Payload chứa: `sub`, `type: "refresh"`, `jti`, `iat`, `exp`.
+
+    oauth2:
+      type: oauth2
+      description: Chuẩn ủy quyền OAuth 2.0 sử dụng luồng Authorization Code kết hợp PKCE (RFC 7636).
+      flows:
+        authorizationCode:
+          authorizationUrl: https://auth.socialnetwork.example.com/oauth/authorize
+          tokenUrl: https://auth.socialnetwork.example.com/oauth/token
+          refreshUrl: https://auth.socialnetwork.example.com/oauth/token
+          scopes:
+            posts:read: Quyền đọc các bài viết công khai, bạn bè và bài viết được chia sẻ
+            posts:write: Quyền tạo mới, chỉnh sửa và xóa bài viết của chính người dùng
+            profile:read: Quyền xem thông tin hồ sơ cơ bản
+            admin: Quyền quản trị toàn quyền hệ thống
+
+  schemas:
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: Địa chỉ email tài khoản người dùng
+          example: "alice@example.com"
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 128
+          writeOnly: true
+          description: Mật khẩu người dùng (tối thiểu 8 ký tự, không bao giờ được trả lại trong response)
+          example: "AliceSecurePass123!"
+
+    AuthResponse:
+      type: object
+      required:
+        - access_token
+        - refresh_token
+        - token_type
+        - expires_in
+        - refresh_expires_in
+        - scopes
+        - user
+      properties:
+        access_token:
+          type: string
+          description: JWT Access Token dùng để truy cập các tài nguyên được bảo vệ
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwicm9sZXMiOlsidXNlciJdLCJzY29wZXMiOlsicG9zdHM6cmVhZCJdLCJqdGkiOiI3ZjQwYzhkMCIsImV4cCI6MTcyOTkzNjkwMH0.SIGNATURE"
+        refresh_token:
+          type: string
+          description: JWT Refresh Token dùng để gia hạn Access Token
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwidHlwZSI6InJlZnJlc2giLCJqdGkiOiJkZTY1NDMyMSIsImV4cCI6MTczMjUyODAwMH0.SIGNATURE"
+        token_type:
+          type: string
+          example: "Bearer"
+        expires_in:
+          type: integer
+          description: Thời gian hiệu lực của access token tính bằng giây (15 phút = 900 giây)
+          example: 900
+        refresh_expires_in:
+          type: integer
+          description: Thời gian hiệu lực của refresh token tính bằng giây (30 ngày = 2,592,000 giây)
+          example: 2592000
+        scopes:
+          type: array
+          items:
+            type: string
+          description: Danh sách quyền được cấp trong phiên làm việc
+          example: ["posts:read", "posts:write", "profile:read"]
+        user:
+          $ref: '#/components/schemas/UserProfile'
+
+    RefreshRequest:
+      type: object
+      properties:
+        refresh_token:
+          type: string
+          description: Chuỗi JWT Refresh Token (tùy chọn trong body nếu đã truyền qua header Authorization)
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwidHlwZSI6InJlZnJlc2giLCJqdGkiOiJkZTY1NDMyMSIsImV4cCI6MTczMjUyODAwMH0.SIGNATURE"
+
+    RefreshResponse:
+      type: object
+      required:
+        - access_token
+        - token_type
+        - expires_in
+      properties:
+        access_token:
+          type: string
+          description: JWT Access Token mới được cấp
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwicm9sZXMiOlsidXNlciJdLCJzY29wZXMiOlsicG9zdHM6cmVhZCJdLCJqdGkiOiIxYTJiM2M0ZCIsImV4cCI6MTcyOTkzNzgwMH0.SIGNATURE"
+        refresh_token:
+          type: string
+          description: Refresh Token mới xoay vòng (khi áp dụng Token Rotation)
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwidHlwZSI6InJlZnJlc2giLCJqdGkiOiI5ZjhlN2Q2YyIsImV4cCI6MTczMjUzMDkwMH0.SIGNATURE"
+        token_type:
+          type: string
+          example: "Bearer"
+        expires_in:
+          type: integer
+          example: 900
+
+    UserProfile:
+      type: object
+      required:
+        - id
+        - username
+        - email
+        - full_name
+        - role
+      properties:
+        id:
+          type: integer
+          example: 1
+        username:
+          type: string
+          example: "alice"
+        email:
+          type: string
+          format: email
+          example: "alice@example.com"
+        full_name:
+          type: string
+          example: "Alice Nguyen"
+        avatar_url:
+          type: string
+          format: uri
+          nullable: true
+          example: "https://avatar.socialnetwork.example.com/alice.png"
+        role:
+          type: string
+          enum: ["user", "moderator", "admin"]
+          example: "user"
+
+    AuthorSummary:
+      type: object
+      required:
+        - id
+        - username
+        - full_name
+      description: DTO thông tin tóm tắt của tác giả bài viết (chỉ xuất trường công khai, triệt tiêu PII nhạy cảm)
+      properties:
+        id:
+          type: integer
+          example: 1
+        username:
+          type: string
+          example: "alice"
+        full_name:
+          type: string
+          example: "Alice Nguyen"
+        avatar_url:
+          type: string
+          format: uri
+          nullable: true
+          example: "https://avatar.socialnetwork.example.com/alice.png"
+
+    PostResponse:
+      type: object
+      required:
+        - id
+        - author
+        - content
+        - visibility
+        - likes_count
+        - comments_count
+        - created_at
+      properties:
+        id:
+          type: integer
+          description: Mã định danh bài viết
+          example: 101
+        author:
+          $ref: '#/components/schemas/AuthorSummary'
+        content:
+          type: string
+          description: Nội dung văn bản của bài viết
+          example: "Hôm nay tôi hoàn thành bài lab bảo mật API về JWT và RBAC! #learning #security"
+        media_urls:
+          type: array
+          items:
+            type: string
+            format: uri
+          description: Danh sách đường dẫn ảnh/video đính kèm
+          example:
+            - "https://cdn.socialnetwork.example.com/photos/post-101.jpg"
+        visibility:
+          type: string
+          enum: ["public", "friends_only", "private"]
+          description: >
+            Mức độ hiển thị của bài viết:
+            - `public`: Công khai cho toàn bộ người dùng có scope `posts:read`.
+            - `friends_only`: Chỉ tác giả hoặc bạn bè được phép xem.
+            - `private`: Chỉ chính tác giả hoặc admin/moderator được phép xem.
+          example: "public"
+        tags:
+          type: array
+          items:
+            type: string
+          example: ["learning", "security"]
+        likes_count:
+          type: integer
+          minimum: 0
+          example: 42
+        comments_count:
+          type: integer
+          minimum: 0
+          example: 7
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-10-26T08:30:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-10-26T08:30:00Z"
+
+    ProblemDetails:
+      type: object
+      required:
+        - type
+        - title
+        - status
+        - detail
+      description: Cấu trúc phản hồi lỗi chuẩn RFC 7807 (Problem Details for HTTP APIs)
+      properties:
+        type:
+          type: string
+          format: uri
+          description: URI tham chiếu đến tài liệu mô tả loại lỗi
+          example: "https://api.socialnetwork.example.com/errors/unauthorized"
+        title:
+          type: string
+          description: Tiêu đề ngắn gọn của lỗi
+          example: "Unauthorized"
+        status:
+          type: integer
+          description: Mã trạng thái HTTP tương ứng
+          example: 401
+        detail:
+          type: string
+          description: Thông báo chi tiết về nguyên nhân gây lỗi
+          example: "Invalid email or password."
+        instance:
+          type: string
+          description: URI của endpoint phát sinh lỗi
+          example: "/api/v1/auth/login"
+        code:
+          type: string
+          description: Mã định danh lỗi nội bộ dành cho client xử lý tự động
+          example: "invalid_credentials"
+        invalid_params:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              reason:
+                type: string
+          description: Danh sách các trường dữ liệu đầu vào không hợp lệ (nếu là lỗi validation 400/422)
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-10-26T08:30:00Z"
+
+  responses:
+    BadRequest:
+      description: Dữ liệu gửi lên không đúng định dạng JSON hoặc thiếu trường dữ liệu bắt buộc.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          example:
+            type: "https://api.socialnetwork.example.com/errors/bad-request"
+            title: "Bad Request"
+            status: 400
+            detail: "Request body must be a valid JSON object with 'email' and 'password'."
+            instance: "/api/v1/auth/login"
+            code: "malformed_request"
+            timestamp: "2026-10-26T08:30:00Z"
+
+    Unauthorized:
+      description: Xác thực danh tính thất bại do thiếu token, sai credentials, token hết hạn hoặc token đã bị thu hồi.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          example:
+            type: "https://api.socialnetwork.example.com/errors/unauthorized"
+            title: "Unauthorized"
+            status: 401
+            detail: "Invalid email or password."
+            instance: "/api/v1/auth/login"
+            code: "invalid_credentials"
+            timestamp: "2026-10-26T08:30:00Z"
+
+    Forbidden:
+      description: Từ chối truy cập do thiếu scope yêu cầu, gửi nhầm loại token hoặc vi phạm quyền trên đối tượng (BOLA).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          example:
+            type: "https://api.socialnetwork.example.com/errors/forbidden"
+            title: "Forbidden"
+            status: 403
+            detail: "You do not have permission to view this private post."
+            instance: "/api/v1/posts/103"
+            code: "forbidden_resource"
+            timestamp: "2026-10-26T08:30:00Z"
+
+    NotFound:
+      description: Tài nguyên yêu cầu không tồn tại hoặc đã bị ẩn vì lý do an toàn bảo mật.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          example:
+            type: "https://api.socialnetwork.example.com/errors/not-found"
+            title: "Not Found"
+            status: 404
+            detail: "Post with ID 999 does not exist."
+            instance: "/api/v1/posts/999"
+            code: "post_not_found"
+            timestamp: "2026-10-26T08:30:00Z"
+
+    UnprocessableEntity:
+      description: Cú pháp JSON đúng nhưng dữ liệu bên trong không thỏa mãn các quy tắc kiểm tra ràng buộc nghiệp vụ.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          example:
+            type: "https://api.socialnetwork.example.com/errors/unprocessable-entity"
+            title: "Unprocessable Entity"
+            status: 422
+            detail: "Validation failed for one or more fields."
+            instance: "/api/v1/auth/login"
+            code: "validation_error"
+            invalid_params:
+              - name: "email"
+                reason: "Email format is invalid according to RFC 5322."
+            timestamp: "2026-10-26T08:30:00Z"
+
+    TooManyRequests:
+      description: Người dùng gửi quá nhiều request trong một khoảng thời gian quy định (Rate Limit Exceeded).
+      headers:
+        Retry-After:
+          description: Số giây người dùng cần chờ trước khi có thể thử lại
+          schema:
+            type: integer
+            example: 60
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          example:
+            type: "https://api.socialnetwork.example.com/errors/too-many-requests"
+            title: "Too Many Requests"
+            status: 429
+            detail: "Too many failed login attempts. Please wait 60 seconds before trying again."
+            instance: "/api/v1/auth/login"
+            code: "rate_limit_exceeded"
+            timestamp: "2026-10-26T08:30:00Z"
+
+    InternalServerError:
+      description: Lỗi máy chủ không mong muốn trong quá trình xử lý request.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          example:
+            type: "https://api.socialnetwork.example.com/errors/internal-server-error"
+            title: "Internal Server Error"
+            status: 500
+            detail: "An unexpected error occurred. Please try again later."
+            instance: "/api/v1/posts/101"
+            code: "internal_error"
+            timestamp: "2026-10-26T08:30:00Z"
