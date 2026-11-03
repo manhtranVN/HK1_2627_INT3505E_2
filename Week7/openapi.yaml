@@ -1,0 +1,550 @@
+openapi: 3.0.3
+info:
+  title: Product & Order Management Service API
+  version: 1.0.0
+  description: >
+    Production-grade RESTful Backend Service implementing 7 backend design principles,
+    Application Factory pattern, SQLAlchemy 2.x ORM, Marshmallow Schemas, Eager Loading (preventing N+1 queries),
+    and multi-probe Health Checks (/healthz, /ready).
+servers:
+  - url: http://localhost:5000
+    description: Local Development / Docker Server
+
+paths:
+  /healthz:
+    get:
+      summary: Liveness Probe
+      description: Lightweight check verifying process is alive without touching database.
+      responses:
+        '200':
+          description: Process alive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /ready:
+    get:
+      summary: Readiness Probe
+      description: Verifies backend dependencies (database connectivity).
+      responses:
+        '200':
+          description: Backend ready to receive traffic
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+        '503':
+          description: Backend degraded / database unreachable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+
+  /api/v1/products:
+    get:
+      summary: List active products (paginated)
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: List of products successfully retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductListResponse'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+    post:
+      summary: Create a new product
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductIn'
+      responses:
+        '201':
+          description: Product successfully created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '409':
+          $ref: '#/components/responses/409Conflict'
+        '422':
+          $ref: '#/components/responses/422ValidationError'
+
+  /api/v1/products/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      summary: Get single product by ID
+      responses:
+        '200':
+          description: Product found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+    patch:
+      summary: Partially update product
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductPatch'
+      responses:
+        '200':
+          description: Product updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '409':
+          $ref: '#/components/responses/409Conflict'
+        '422':
+          $ref: '#/components/responses/422ValidationError'
+    delete:
+      summary: Soft-delete product (set archived=true)
+      responses:
+        '204':
+          description: Product soft-deleted successfully (no content)
+        '404':
+          $ref: '#/components/responses/404NotFound'
+
+  /api/v1/products/{id}/reserve:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    post:
+      summary: Reserve inventory quantity for a product
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReserveIn'
+      responses:
+        '200':
+          description: Stock reserved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Successfully reserved 2 unit(s)
+                  product:
+                    $ref: '#/components/schemas/Product'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '409':
+          description: Out of stock or conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/422ValidationError'
+
+  /api/v1/orders:
+    get:
+      summary: List orders (paginated, eager-loaded items)
+      description: Uses selectinload eager loading to prevent N+1 query problem.
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: Orders retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderListResponse'
+    post:
+      summary: Create order with OrderItems linking Products
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderCreateIn'
+      responses:
+        '201':
+          description: Order placed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '409':
+          $ref: '#/components/responses/409Conflict'
+        '422':
+          $ref: '#/components/responses/422ValidationError'
+
+  /api/v1/orders/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      summary: Get order details by ID
+      responses:
+        '200':
+          description: Order retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+
+  /api/v1/orders/{id}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    post:
+      summary: Cancel order and restock inventory
+      responses:
+        '200':
+          description: Order cancelled and stock restored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '409':
+          $ref: '#/components/responses/409Conflict'
+
+components:
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    PageParam:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        default: 1
+        minimum: 1
+    SizeParam:
+      name: size
+      in: query
+      required: false
+      schema:
+        type: integer
+        default: 20
+        minimum: 1
+        maximum: 100
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+
+    ReadinessResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        checks:
+          type: object
+          properties:
+            db:
+              type: string
+              example: ok
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        sku:
+          type: string
+          example: LAPTOP-MBP-14
+        name:
+          type: string
+          example: MacBook Pro 14 M3 Pro
+        description:
+          type: string
+          nullable: true
+          example: Apple MacBook Pro 14 inch, M3 Pro chip
+        price_cents:
+          type: integer
+          example: 199900
+        qty_in_stock:
+          type: integer
+          example: 25
+        archived:
+          type: boolean
+          example: false
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ProductIn:
+      type: object
+      required:
+        - sku
+        - name
+        - price_cents
+      properties:
+        sku:
+          type: string
+          pattern: '^[A-Z0-9-]+$'
+          minLength: 3
+          maxLength: 32
+          example: LAPTOP-MBP-14
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: MacBook Pro 14 M3 Pro
+        description:
+          type: string
+          maxLength: 2000
+          nullable: true
+        price_cents:
+          type: integer
+          minimum: 0
+          maximum: 10000000
+          example: 199900
+        qty_in_stock:
+          type: integer
+          minimum: 0
+          default: 0
+          example: 25
+
+    ProductPatch:
+      type: object
+      properties:
+        sku:
+          type: string
+          pattern: '^[A-Z0-9-]+$'
+          minLength: 3
+          maxLength: 32
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 2000
+          nullable: true
+        price_cents:
+          type: integer
+          minimum: 0
+          maximum: 10000000
+        qty_in_stock:
+          type: integer
+          minimum: 0
+
+    ReserveIn:
+      type: object
+      required:
+        - qty
+      properties:
+        qty:
+          type: integer
+          minimum: 1
+          example: 1
+
+    ProductListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+        page:
+          type: integer
+          example: 1
+        size:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 8
+
+    OrderItemIn:
+      type: object
+      required:
+        - product_id
+        - quantity
+      properties:
+        product_id:
+          type: integer
+          minimum: 1
+          example: 1
+        quantity:
+          type: integer
+          minimum: 1
+          example: 2
+
+    OrderCreateIn:
+      type: object
+      required:
+        - customer_name
+        - customer_email
+        - items
+      properties:
+        customer_name:
+          type: string
+          example: Nguyen Van A
+        customer_email:
+          type: string
+          format: email
+          example: nguyenvana@example.com
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/OrderItemIn'
+
+    OrderItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        order_id:
+          type: integer
+          example: 10
+        product_id:
+          type: integer
+          example: 1
+        product_sku:
+          type: string
+          example: LAPTOP-MBP-14
+        product_name:
+          type: string
+          example: MacBook Pro 14 M3 Pro
+        quantity:
+          type: integer
+          example: 2
+        unit_price_cents:
+          type: integer
+          example: 199900
+        subtotal_cents:
+          type: integer
+          example: 399800
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 10
+        order_number:
+          type: string
+          example: ORD-20261103-DEMO01
+        customer_name:
+          type: string
+          example: Nguyen Van A
+        customer_email:
+          type: string
+          example: nguyenvana@example.com
+        status:
+          type: string
+          enum: [PENDING, CONFIRMED, CANCELLED, COMPLETED]
+          example: PENDING
+        total_price_cents:
+          type: integer
+          example: 399800
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+
+    OrderListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Order'
+        page:
+          type: integer
+          example: 1
+        size:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 5
+
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: string
+          example: conflict
+        error:
+          type: string
+          example: conflict
+        message:
+          type: string
+          example: Product with SKU already exists
+        detail:
+          type: string
+
+  responses:
+    400BadRequest:
+      description: Bad Request (Invalid parameters or non-JSON body)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    404NotFound:
+      description: Resource Not Found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    409Conflict:
+      description: State conflict (duplicate SKU or out of stock)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    422ValidationError:
+      description: Request validation error (Marshmallow schema failure)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+

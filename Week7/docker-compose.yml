@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: product_api_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: devpw
+      POSTGRES_DB: appdb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d appdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: product_api_service
+    restart: unless-stopped
+    environment:
+      DB_URL: postgresql+psycopg2://app:devpw@db:5432/appdb
+      APP_CONFIG: product_api.config.ProductionConfig
+      LOG_LEVEL: INFO
+      SECRET_KEY: docker-production-super-secret-key-32chars
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "5000:5000"
+
+volumes:
+  pgdata:
+

@@ -1,6 +1,5 @@
 # BÁO CÁO ĐÁNH GIÁ BẢO MẬT HỆ THỐNG API (SECURITY AUDIT REPORT)
 ## Dự án: Social Network API — Authentication & Authorization Service
-**Môn học:** Kiến trúc & Thiết kế Phần mềm / Phát triển Dịch vụ Web  
 **Mục tiêu:** Rà soát và liệt kê các điểm có thể làm lộ thông tin, rò rỉ dữ liệu hoặc bị khai thác tấn công trong hệ thống API mạng xã hội (tập trung vào 3 endpoint: `POST /auth/login`, `POST /auth/refresh`, `GET /posts/{id}`).  
 **Tiêu chuẩn đối chiếu:** OWASP API Security Top 10 (2023), RFC 6749 (OAuth 2.0), RFC 7519 (JWT), RFC 7617 (Basic Auth), NIST SP 800-63B.
 
@@ -15,13 +14,13 @@ Hệ thống cung cấp dịch vụ mạng xã hội với 3 endpoints trọng y
 
 ---
 
-## 2. DANH SÁCH CHI TIẾT CÁC ĐIỂM CÓ THỂ LỘ THÔNG TIN & RỦI RO BẢO MẬT (≥ 5 ĐIỂM)
+## 2. DANH SÁCH CHI TIẾT CÁC ĐIỂM CÓ THỂ LỘ THÔNG TIN & RỦI RO BẢO MẬT
 
 Dưới đây là 8 điểm rò rỉ thông tin và lỗ hổng tiềm ẩn đã được phân tích, chứng minh kịch bản tấn công và đề xuất giải pháp xử lý triệt để:
 
 ---
 
-### Điểm lộ 1: Broken Object Level Authorization (BOLA / IDOR) trên Endpoint `GET /posts/{id}`
+### Lỗ hổng 1: Broken Object Level Authorization (BOLA / IDOR) trên Endpoint `GET /posts/{id}`
 * **Mã định danh:** OWASP API1:2023 — Broken Object Level Authorization
 * **Mức độ nghiêm trọng:** **CRITICAL (CVSS: 9.1)**
 * **Vị trí ảnh hưởng:** Endpoint `GET /posts/{id}`
@@ -87,7 +86,7 @@ def user_can_access_post(id_param="id"):
 
 ---
 
-### Điểm lộ 2: Lộ tài khoản (User Enumeration) & Timing Attack trên Endpoint `POST /auth/login`
+### Lỗ hổng 2: Lộ tài khoản (User Enumeration) & Timing Attack trên Endpoint `POST /auth/login`
 * **Mã định danh:** OWASP API2:2023 — Broken Authentication
 * **Mức độ nghiêm trọng:** **HIGH (CVSS: 7.5)**
 * **Vị trí ảnh hưởng:** Endpoint `POST /auth/login`
@@ -132,7 +131,7 @@ def verify_credentials(email, password):
 
 ---
 
-### Điểm lộ 3: Rò rỉ Dữ liệu Nhạy cảm (PII) & Thông tin Nội bộ trong Payload của JWT
+### Lỗ hổng 3: Rò rỉ Dữ liệu Nhạy cảm (PII) & Thông tin Nội bộ trong Payload của JWT
 * **Mã định danh:** OWASP API3:2023 — Broken Object Property Level Authorization & Slide 14, 18 (Lỗi 06)
 * **Mức độ nghiêm trọng:** **HIGH (CVSS: 7.8)**
 * **Vị trí ảnh hưởng:** Cấu trúc JWT Payload (Access Token & Refresh Token)
@@ -167,7 +166,7 @@ Rất nhiều lập trình viên hiểu nhầm rằng: *"JWT là token được 
 
 ---
 
-### Điểm lộ 4: Lộ Token qua Lưu trữ Không an toàn tại Client (XSS đánh cắp qua `localStorage`)
+### Lỗ hổng 4: Lộ Token qua Lưu trữ Không an toàn tại Client (XSS đánh cắp qua `localStorage`)
 * **Mã định danh:** OWASP API2:2023 & Slide 18 (Lỗi 05)
 * **Mức độ nghiêm trọng:** **HIGH (CVSS: 8.2)**
 * **Vị trí ảnh hưởng:** Phía Client Web / Browser Storage
@@ -199,7 +198,7 @@ localStorage.setItem('refresh_token', res.data.refresh_token);
 
 ---
 
-### Điểm lộ 5: Rò rỉ Token & Credentials qua Nhật ký hệ thống (Logging, Monitoring, Crash Reports)
+### Lỗ hổng 5: Rò rỉ Token & Credentials qua Nhật ký hệ thống (Logging, Monitoring, Crash Reports)
 * **Mã định danh:** OWASP API8:2023 — Security Misconfiguration & Slide 7, 29
 * **Mức độ nghiêm trọng:** **HIGH (CVSS: 7.4)**
 * **Vị trí ảnh hưởng:** Hệ thống Logging (Flask logger, Nginx Access Log, Logstash, Sentry, Datadog)
@@ -242,7 +241,7 @@ def sanitize_payload(data):
 
 ---
 
-### Điểm lộ 6: Tái sử dụng Token bị đánh cắp do Thiếu cơ chế Thu hồi (Token Revocation) & Refresh Token Replay
+### Lỗ hổng 6: Tái sử dụng Token bị đánh cắp do Thiếu cơ chế Thu hồi (Token Revocation) & Refresh Token Replay
 * **Mã định danh:** OWASP API2:2023 — Broken Authentication & Slide 13, 15, 17, 20
 * **Mức độ nghiêm trọng:** **HIGH (CVSS: 8.0)**
 * **Vị trí ảnh hưởng:** Endpoint `POST /auth/refresh` và cơ chế quản lý vòng đời JWT
@@ -272,7 +271,7 @@ def check_if_token_revoked(jwt_header, jwt_payload):
 
 ---
 
-### Điểm lộ 7: Lộ Hash Mật khẩu & Dữ liệu Nhạy cảm của Tác giả qua Mass Assignment / Thiếu DTO Serialization trên `GET /posts/{id}`
+### Lỗ hổng 7: Lộ Hash Mật khẩu & Dữ liệu Nhạy cảm của Tác giả qua Mass Assignment / Thiếu DTO Serialization trên `GET /posts/{id}`
 * **Mã định danh:** OWASP API3:2023 — Broken Object Property Level Authorization
 * **Mức độ nghiêm trọng:** **HIGH (CVSS: 7.3)**
 * **Vị trí ảnh hưởng:** Dữ liệu phản hồi của endpoint `GET /posts/{id}`
@@ -318,7 +317,7 @@ def get_post(id):
 
 ---
 
-### Điểm lộ 8: Bypass Xác thực qua JWT Algorithm Confusion & Khóa Bí mật Yếu
+### Lỗ hổng 8: Bypass Xác thực qua JWT Algorithm Confusion & Khóa Bí mật Yếu
 * **Mã định danh:** Slide 18 (Lỗi 01: `alg=none`, Lỗi 02: Algorithm confusion HS↔RS, Lỗi 04: Secret yếu)
 * **Mức độ nghiêm trọng:** **CRITICAL (CVSS: 9.8)**
 * **Vị trí ảnh hưởng:** Quá trình giải mã & kiểm chứng chữ ký JWT trên toàn bộ API
@@ -348,9 +347,9 @@ def get_post(id):
 
 ---
 
-## 3. MA TRẬN ĐÁNH GIÁ RỦI RO (RISK MATRIX)
+## 3. Đánh giá rủi ro
 
-| STT | Lỗ hổng / Điểm lộ | Phân loại OWASP / Slide | Tác động | Khả năng khai thác | Mức độ rủi ro | Trạng thái khắc phục trong code mẫu |
+| STT | Lỗ hổng / Lỗ hổng | Phân loại OWASP / Slide | Tác động | Khả năng khai thác | Mức độ rủi ro | Trạng thái khắc phục trong code mẫu |
 |:---:|:---|:---|:---:|:---:|:---:|:---:|
 | **1** | BOLA / IDOR đọc trộm bài viết private trên `GET /posts/{id}` | OWASP API1:2023 | Nghiêm trọng (9/10) | Dễ (9/10) | **CRITICAL** | Đã khắc phục (Decorator 3 lớp) |
 | **2** | Lộ tài khoản & Timing Attack trên `POST /auth/login` | OWASP API2:2023 | Trung bình (6/10) | Cao (8/10) | **HIGH** | Đã khắc phục (Dummy Hash & Generic Error) |
@@ -363,25 +362,3 @@ def get_post(id):
 
 ---
 
-## 4. CHECKLIST "5 ĐIỀU PHẢI CÓ TRƯỚC KHI SHIP" (ĐỐI CHIẾU SLIDE 29)
-
-Căn cứ vào bài giảng Slide 29, hệ thống API Social Network đã được rà soát và đáp ứng toàn diện 5 tiêu chuẩn bắt buộc trước khi đưa vào vận hành (Production Readiness):
-
-1. **Phân loại endpoint public/protected; mặc định từ chối (Fail-Closed):**
-   * Đạt. Mọi route đều mặc định áp dụng xác thực, chỉ mở công khai duy nhất `POST /auth/login` và `/docs`. Route `/posts/{id}` bắt buộc token có scope `posts:read` và kiểm tra quyền sở hữu bài viết.
-2. **Lỗi login chung, giảm rò thông tin qua thời gian:**
-   * Đạt. Endpoint login luôn trả về `401 Unauthorized` kèm thông điệp `"Invalid email or password"`. Tích hợp dummy password hash bằng Argon2id để san bằng độ trễ xử lý.
-3. **Rate-limit theo rủi ro; tránh lockout gây từ chối dịch vụ (DoS):**
-   * Đạt. Áp dụng giới hạn tần suất 5 lần thử sai / phút trên IP/email của login, ngăn chặn các đợt tấn công brute-force và credential stuffing.
-4. **Log sự kiện cần thiết; không log password/token:**
-   * Đạt. Bộ lọc log tự động mask toàn bộ header `Authorization`, `Cookie` và các trường `password`, `token` trong request body.
-5. **Kiểm thử quyền và rà soát khi có thay đổi:**
-   * Đạt. Xây dựng bộ test tự động (Pytest) bao phủ toàn diện các kịch bản kiểm tra quyền: vai trò (RBAC), phạm vi (Scopes), kiểm tra BOLA trên bài viết riêng tư, và cơ chế thu hồi token.
-
----
-
-## 5. KẾT LUẬN & KHUYẾN NGHỊ
-
-Báo cáo an ninh xác nhận rằng việc phân tách rõ ràng giữa **Xác thực (AuthN - bạn là ai)** và **Phân quyền (AuthZ - bạn được làm gì)** cùng với mô hình **bảo vệ 3 lớp (AuthN -> Scope -> Object Ownership)** là điều kiện tiên quyết để bảo vệ an toàn cho hệ thống mạng xã hội hiện đại.
-
-Mọi điểm có nguy cơ rò rỉ dữ liệu đã được nhận diện, phân tích chi tiết và cài đặt các biện pháp kỹ thuật triệt để trong mã nguồn triển khai tại thư mục `Week6/`.

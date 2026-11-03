@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "product-api"
+version = "1.0.0"
+description = "Production-grade Product & Order Backend Service with Flask, SQLAlchemy 2.x, Marshmallow, and Docker"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "Flask>=3.0.0",
+    "Flask-SQLAlchemy>=3.1.0",
+    "SQLAlchemy>=2.0.0",
+    "marshmallow>=3.20.0",
+    "Flask-Migrate>=4.0.0",
+    "gunicorn>=21.0.0",
+    "psycopg2-binary>=2.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "requests>=2.31.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
