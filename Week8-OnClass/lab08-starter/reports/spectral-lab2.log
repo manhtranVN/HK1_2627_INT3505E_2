@@ -1,0 +1,38 @@
+# Lab 2 — Spectral lint evidence
+# Generated: 2026-11-11
+# spectral-cli: 6.17.1 | node: v24.13.1
+# Ruleset: .spectral.yml (extends spectral:oas + 3 custom rules)
+
+========================================================================
+AFTER FIX (required deliverable) — expect 0 problems
+$ spectral lint openapi.yaml --ruleset .spectral.yml
+========================================================================
+No results with a severity of 'error' found!
+exit code: 0
+
+========================================================================
+BEFORE FIX — original starter spec (git HEAD) with the SAME ruleset
+$ git show HEAD:.../openapi.yaml | spectral lint - --ruleset .spectral.yml
+========================================================================
+
+f:/tmp/original-openapi.yaml
+  24:9   error  operation-operationId  Operation must have "operationId".                                                                        paths./books.get
+  95:19  error  no-204-body            #/paths/~1books~1%7Bid%7D/delete/responses/204/content declares a body on 204; remove the content block.  paths./books/{id}.delete.responses[204].content
+ 110:22  error  book-year-integer      #/components/schemas/Book/properties/year/type must be type integer (found string).                       components.schemas.Book.properties.year.type
+
+✖ 3 problems (3 errors, 0 warnings, 0 infos, 0 hints)
+exit code: 1
+
+========================================================================
+CUSTOM RULE demo — empty 200 object schema (health) added to a broken copy
+Proves response-200-non-empty-schema fires on schema: {type: object}
+========================================================================
+
+f:/tmp/broken-openapi2.yaml
+ 18:22  error  response-200-non-empty-schema  #/paths/~1health/get/responses/200/content/application~1json/schema is an empty schema; add object properties or array items.  paths./health.get.responses[200].content.application/json.schema
+  21:9  error  operation-operationId          Operation must have "operationId".                                                                                             paths./books.get
+ 45:19  error  no-204-body                    #/paths/~1books~1%7Bid%7D/delete/responses/204/content declares a body on 204; remove the content block.                       paths./books/{id}.delete.responses[204].content
+ 59:22  error  book-year-integer              #/components/schemas/Book/properties/year/type must be type integer (found string).                                            components.schemas.Book.properties.year.type
+
+✖ 4 problems (4 errors, 0 warnings, 0 infos, 0 hints)
+exit code: 1

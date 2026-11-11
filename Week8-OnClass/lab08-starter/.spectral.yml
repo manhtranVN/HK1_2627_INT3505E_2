@@ -1,0 +1,54 @@
+extends:
+  - spectral:oas
+
+rules:
+  # --- Base ruleset tuning -------------------------------------------------
+  operation-operationId: error
+  info-contact: off
+  info-license: off
+  license-url: off
+  openapi-tags: off
+  operation-description: off
+  operation-tags: off
+  operation-singular-tag: off
+  operation-tag-defined: off
+  tag-description: off
+
+  no-204-body:
+    description: "204 No Content responses must not declare a response body."
+    message: "{{path}} declares a body on 204; remove the content block."
+    severity: error
+    given: "$.paths[*][get,put,post,delete,patch,options,head].responses['204']"
+    then:
+      field: content
+      function: falsy
+
+  book-year-integer:
+    description: "Book.year must be an integer to match the Flask/SQLAlchemy model."
+    message: "{{path}} must be type integer (found {{value}})."
+    severity: error
+    given: "$.components.schemas.Book.properties.year"
+    then:
+      field: type
+      function: enumeration
+      functionOptions:
+        values:
+          - integer
+
+  response-200-non-empty-schema:
+    description: "200 response schema must define at least one field."
+    message: "{{path}} is an empty schema; add object properties or array items."
+    severity: error
+    given: "$.paths[*][get,put,post,delete,patch,options,head].responses['200'].content['application/json'].schema"
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          type: object
+          anyOf:
+            - required: [properties]
+              properties:
+                properties:
+                  type: object
+                  minProperties: 1
+            - required: [items]

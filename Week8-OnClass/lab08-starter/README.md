@@ -74,7 +74,9 @@ spectral lint openapi.yaml --ruleset .spectral.yml
 ```
 
 `.spectral.yml` đã có hai rule riêng kiểm tra (2) và (3); `spectral:oas` kiểm tra các quy tắc nền, bao gồm operationId. Hãy sửa 3 lỗi trong spec và **tự bổ sung custom rule** kiểm tra response 200 có schema không rỗng. Lưu ý: Spectral linter không tự đối chiếu code Flask; một spec hợp lệ vẫn có thể khác hành vi thực tế. Hãy dùng pytest + jsonschema để kiểm chứng response.
+### Kết quả kiểm thử Lab 2
 
+![Kết quả test Lab 2](reports/image copy.png)
 ## 4. Lab 3 — Postman/Newman
 
 File `books-api.postman_collection.json` chứa 5 happy-path requests chạy theo thứ tự: list → create → get → update → delete. Request tạo lưu `book_id` trong collection variables. Hãy:
