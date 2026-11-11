@@ -1,0 +1,94 @@
+openapi: "3.0.3"
+info:
+  title: Product Service (Design-First)
+  version: "1.0.0"
+  description: "Demo Design-First: OpenAPI spec được viết trước, Connexion tự động map operationId đến Python handler."
+
+paths:
+  /products:
+    get:
+      summary: Lấy danh sách sản phẩm
+      operationId: api.products.list_products
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+    post:
+      summary: Tạo sản phẩm mới
+      operationId: api.products.create_product
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductIn"
+      responses:
+        "201":
+          description: Đã tạo thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "400":
+          description: Dữ liệu không hợp lệ
+
+  /products/{id}:
+    get:
+      summary: Lấy chi tiết sản phẩm theo ID
+      operationId: api.products.get_product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "404":
+          description: Không tìm thấy sản phẩm
+
+components:
+  schemas:
+    ProductIn:
+      type: object
+      required:
+        - sku
+        - name
+        - price_cents
+      properties:
+        sku:
+          type: string
+          example: "DF-DELL-XPS"
+        name:
+          type: string
+          example: "Dell XPS 15"
+        price_cents:
+          type: integer
+          minimum: 0
+          example: 249900
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        sku:
+          type: string
+          example: "DF-DELL-XPS"
+        name:
+          type: string
+          example: "Dell XPS 15"
+        price_cents:
+          type: integer
+          example: 249900
+
