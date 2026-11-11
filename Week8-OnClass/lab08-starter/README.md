@@ -79,20 +79,36 @@ spectral lint openapi.yaml --ruleset .spectral.yml
 ![Kết quả test Lab 2](reports/image copy.png)
 ## 4. Lab 3 — Postman/Newman
 
-File `books-api.postman_collection.json` chứa 5 happy-path requests chạy theo thứ tự: list → create → get → update → delete. Request tạo lưu `book_id` trong collection variables. Hãy:
+File `books-api.postman_collection.json` gồm 2 folder:
+- `books/` — 5 happy-path requests theo thứ tự: list → create → get → update → delete. Request create lưu `book_id` vào **collection variable**; GET/PUT/DELETE dùng lại `{{book_id}}`.
+- `error-cases/` — 2 error request, mỗi request ≥2 `pm.test` (status + body):
+  - **POST /books** thiếu `title` → 400, `code == "VALIDATION_ERROR"`, `errors` chứa field `title`.
+  - **GET /books/9999** → 404, `code == "NOT_FOUND"`, `message == "Book not found"`.
 
-- Tạo folder `error-cases/` với **POST /books** thiếu `title` và **GET /books/9999**.
-- Thêm **ít nhất 2 `pm.test` cho mỗi error request**: HTTP status và JSON `code`/`message`.
-- Chạy bằng Newman, lưu JUnit report.
+### Cách chạy (không cần Postman UI)
+
+Nhanh nhất — script tự bật Flask, chờ `/health`, chạy Newman rồi tắt Flask:
 
 ```bash
-npm install -g newman
+bash run_lab3.sh
+```
+
+Hoặc chạy thủ công (cần Node 18+ và venv đã cài deps):
+
+```bash
+mkdir -p instance                       # thư mục SQLite (gitignored)
+python -m app --port 5000 &             # terminal 1: bật API
+npm install -g newman                   # hoặc thay bằng: npx --yes newman ...
 newman run books-api.postman_collection.json \
   -e postman/local.postman_environment.json \
   -r cli,junit --reporter-junit-export reports/junit.xml
 ```
 
-Lưu ý: cần chạy server trước. `data.csv` là dữ liệu ví dụ để thực hành data-driven iteration; khi sử dụng `-d data.csv`, collection sẽ lặp theo số hàng. Đừng hard-code credentials/tokens trong file đẩy lên Git.
+### Kết quả kiểm thử Lab 3
+
+Newman chạy 7 request (5 happy + 2 error), 16 assertion, 0 fail, tổng ~0.4s (<10s). JUnit: `reports/junit.xml` (7 testsuite / 16 testcase). Log CLI: `reports/newman-lab3.log`.
+
+Lưu ý: `data.csv` là dữ liệu ví dụ để thực hành data-driven iteration; khi dùng `-d data.csv`, collection lặp theo số hàng. Đừng hard-code credentials/tokens trong file đẩy lên Git.
 
 ## 5. Lab 4 — Locust
 
