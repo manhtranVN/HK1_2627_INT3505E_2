@@ -112,19 +112,30 @@ Lưu ý: `data.csv` là dữ liệu ví dụ để thực hành data-driven iter
 
 ## 5. Lab 4 — Locust
 
-`performance/locustfile.py` là baseline có weighted tasks; `performance/locustfile_realistic.py` minh hoạ flow có state và demo login. Chạy API trong terminal 1; terminal 2:
+`performance/locustfile.py` có 4 weighted task: `list_books`(3), `read_book`(2), `create_book`(1), `search_by_year`(2). Task `search_by_year` gọi `GET /books?year=` và **giả lập 1% failure bằng `response.failure()` phía client** — không phải HTTP 500 thật, server vẫn trả 200. `performance/locustfile_realistic.py` minh hoạ flow có state + demo login.
+
+### Cách chạy
+
+Nhanh nhất — script tự bật Flask, chạy 3 kịch bản (HTML + CSV) rồi tắt Flask:
 
 ```bash
-mkdir -p reports
-locust -f performance/locustfile.py --headless -H http://127.0.0.1:5000 \
-  -u 10 -r 2 -t 30s --html reports/A.html
-locust -f performance/locustfile.py --headless -H http://127.0.0.1:5000 \
-  -u 50 -r 5 -t 60s --html reports/B.html
-locust -f performance/locustfile.py --headless -H http://127.0.0.1:5000 \
-  -u 200 -r 50 -t 30s --html reports/C.html
+bash run_lab4.sh
 ```
 
-Hoàn thiện TODO `search_by_year` và nếu tạo 1% failure giả lập, **ghi rõ** đó là HTTP 500 do server phát hay client-side `response.failure()` của Locust. Điền `performance/analysis.md` bằng kết quả **đo thực tế**; báo cáo p95, failure rate, RPS, nhận xét giới hạn phép đo. Load test chạy Flask development server + SQLite chỉ có ý nghĩa thực hành, không thể khẳng định SLO production.
+Hoặc chạy tay từng kịch bản (API bật ở terminal 1):
+
+```bash
+mkdir -p reports instance
+locust -f performance/locustfile.py --headless -H http://127.0.0.1:5000 -u 10  -r 2  -t 30s --html reports/A.html
+locust -f performance/locustfile.py --headless -H http://127.0.0.1:5000 -u 50  -r 5  -t 60s --html reports/B.html
+locust -f performance/locustfile.py --headless -H http://127.0.0.1:5000 -u 200 -r 50 -t 30s --html reports/C.html
+```
+
+### Kết quả kiểm thử Lab 4
+
+Đo thực tế (Flask dev server + SQLite): p95 aggregated A=20ms, B=19ms, C=88ms; RPS 4.8 / 23.4 / 97.0; failure chỉ gồm 1% injection ở `GET /books?year=` (không có HTTP 500 thật). Phân tích đầy đủ + trả lời 4 câu hỏi và giới hạn phép đo: `performance/analysis.md`. HTML: `reports/A.html`, `reports/B.html`, `reports/C.html`; log: `reports/locust-lab4.log`.
+
+Load test trên Flask development server + SQLite chỉ có ý nghĩa thực hành, không khẳng định SLO production.
 
 ## 6. Cấu trúc thư mục
 
