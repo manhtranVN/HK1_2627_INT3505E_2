@@ -1,0 +1,135 @@
+openapi: 3.0.3
+info:
+  title: User API — URI Path Versioning
+  version: "2.0"
+  description: >
+    Demo URI path versioning. v1 trả full_name (đã deprecated, xem Sunset header).
+    v2 trả first_name + last_name và hỗ trợ tạo user mới.
+servers:
+  - url: http://127.0.0.1:5000
+paths:
+  /api/v1/users/{id}:
+    get:
+      summary: Lấy user (v1, full_name)
+      deprecated: true
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: User theo schema v1
+          headers:
+            Sunset:
+              description: Thời điểm v1 ngừng hoạt động (RFC 8594)
+              schema:
+                type: string
+                example: Thu, 31 Dec 2026 00:00:00 GMT
+            Deprecation:
+              description: Đánh dấu endpoint đã deprecated
+              schema:
+                type: string
+                example: "true"
+            Link:
+              description: Liên kết tới phiên bản kế nhiệm
+              schema:
+                type: string
+                example: '</api/v2/users>; rel="successor-version"'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserV1'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v2/users/{id}:
+    get:
+      summary: Lấy user (v2, first_name + last_name)
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: User theo schema v2
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserV2'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v2/users:
+    post:
+      summary: Tạo user mới (v2)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserInput'
+      responses:
+        '201':
+          description: Đã tạo user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserV2'
+        '400':
+          description: Thiếu field bắt buộc
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  parameters:
+    UserId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+  responses:
+    NotFound:
+      description: Không tìm thấy user
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    UserV1:
+      type: object
+      properties:
+        id:
+          type: integer
+        full_name:
+          type: string
+        email:
+          type: string
+          format: email
+      required: [id, full_name, email]
+    UserV2:
+      type: object
+      properties:
+        id:
+          type: integer
+        first_name:
+          type: string
+        last_name:
+          type: string
+        email:
+          type: string
+          format: email
+      required: [id, first_name, last_name, email]
+    UserInput:
+      type: object
+      properties:
+        first_name:
+          type: string
+        last_name:
+          type: string
+        email:
+          type: string
+          format: email
+      required: [first_name, last_name, email]
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
