@@ -58,7 +58,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "100 * sum(rate(flask_http_request_total{status=~\"5..\"}[5m])) / sum(rate(flask_http_request_total[5m]))",
+          "expr": "100 * (sum(rate(flask_http_request_total{status=~\"5..\"}[5m])) or vector(0)) / sum(rate(flask_http_request_total[5m]))",
           "legendFormat": "5xx %"
         }
       ]
